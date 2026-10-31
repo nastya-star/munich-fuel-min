@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>(function(){var p;try{p=localStorage.getItem("lang")}catch(e){}if(!p&&"en"==="en"&&/^de\b/i.test(navigator.language||""))p="de";if(p&&p!=="en")location.replace("de/"+location.hash)})()</script>
+<title>Munich Fuel Minimum: cheapest Super E5, E10 and Diesel near Munich</title>
+<meta name="description" content="Find the cheapest Super E5, Super E10 and Diesel within 17 km of Marienplatz, Munich, from live Tankerkönig (MTS-K) prices.">
+<link rel="canonical" href="https://nastya-star.github.io/munich-fuel-min/">
+<link rel="alternate" hreflang="en" href="https://nastya-star.github.io/munich-fuel-min/">
+<link rel="alternate" hreflang="de" href="https://nastya-star.github.io/munich-fuel-min/de/">
+<link rel="alternate" hreflang="x-default" href="https://nastya-star.github.io/munich-fuel-min/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23000'/%3E%3Cpath d='M10 25V9a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M9 25h12M12.5 11h5v4h-5zM20 14h1.5a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 0 3 0V12l-3-3' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="modulepreload" href="core.js">
+<style>
+:root{--bg:#fff;--fg:#0a0a0a;--mute:#555;--line:#0a0a0a;--soft:#d4d4d4;--tint:#f4f4f4;--warn:#7a4b00;--warnbg:#fff7e6;--err:#9b1c1c;--errbg:#fdecec;--sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+@media(prefers-color-scheme:dark){:root{--bg:#0a0a0a;--fg:#f5f5f5;--mute:#a8a8a8;--line:#f5f5f5;--soft:#3a3a3a;--tint:#171717;--warn:#ffd28a;--warnbg:#2a2110;--err:#ffb4b4;--errbg:#2c1414}}
+*{box-sizing:border-box}
+html{background:var(--bg);color-scheme:light dark}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 1rem/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+main{max-width:44rem;margin:0 auto;padding:1rem 1.25rem 4rem}
+a{color:inherit}
+.top{display:flex;justify-content:flex-end;margin-bottom:1.5rem}
+.lang{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;font-size:.85rem;font-weight:700;letter-spacing:.06em}
+.lang a,.lang span{display:flex;align-items:center;justify-content:center;min-width:2.75rem;min-height:2.75rem;padding:0 .7rem;text-decoration:none}
+.lang [aria-current]{background:var(--fg);color:var(--bg)}
+.lang a:hover{background:var(--tint)}
+h1{margin:0;font-size:clamp(1.9rem,6vw,2.6rem);line-height:1.1;letter-spacing:-.01em}
+.lead{margin:.6rem 0 1.75rem;color:var(--mute)}
+h2{margin:0 0 .5rem;font-size:1.05rem}
+.box{border:1px solid var(--soft);border-radius:8px;padding:1rem;margin-bottom:1rem}
+.box p{margin:.25rem 0}
+.small{font-size:.88rem;color:var(--mute)}
+.controls{display:grid;gap:.9rem;margin-top:.9rem}
+label.field{display:grid;gap:.3rem;font-weight:600}
+select{min-height:2.9rem;padding:0 .7rem;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);font:inherit}
+.check{display:flex;gap:.6rem;align-items:flex-start;font-weight:600}
+.check input{width:1.3rem;height:1.3rem;margin:.1rem 0 0;accent-color:var(--fg)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:3rem;padding:.6rem 1.2rem;border:2px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);font:inherit;font-weight:700;text-decoration:none;cursor:pointer}
+.btn:hover{background:var(--tint)}
+.btn:active{transform:translateY(1px)}
+.btn:focus-visible,select:focus-visible,.check input:focus-visible,[role=tab]:focus-visible,.lang a:focus-visible,summary:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
+.btn:disabled{opacity:.55;cursor:progress}
+.btn.primary{width:100%;background:var(--fg);color:var(--bg);font-size:1.05rem;min-height:3.4rem}
+.btn.primary:hover{opacity:.9}
+.btn.small{min-height:2.75rem;padding:.4rem .9rem;font-size:.9rem;border-width:1.5px}
+.status{margin:1rem 0;padding:.75rem 1rem;border-radius:6px;border:1px solid var(--soft)}
+.status:empty{display:none}
+.status p{margin:.15rem 0}
+.status.warn{background:var(--warnbg);color:var(--warn);border-color:currentColor}
+.status.error{background:var(--errbg);color:var(--err);border-color:currentColor}
+[role=tablist]{display:grid;grid-template-columns:repeat(3,1fr);border:2px solid var(--line);border-radius:8px;overflow:hidden;margin:1.5rem 0 1rem}
+[role=tab]{min-height:3rem;border:0;border-left:2px solid var(--line);background:var(--bg);color:var(--fg);font:inherit;font-weight:700;cursor:pointer}
+[role=tab]:first-child{border-left:0}
+[role=tab][aria-selected=true]{background:var(--fg);color:var(--bg)}
+.big{margin:.2rem 0 .6rem;font-size:clamp(2.6rem,12vw,3.6rem);font-weight:800;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.unit{font-size:1.1rem;font-weight:600}
+.tie,.basis{margin:.5rem 0;color:var(--mute);font-size:.92rem}
+.empty{padding:1rem;border:1px dashed var(--soft);border-radius:8px}
+ul.stations{list-style:none;margin:0;padding:0;display:grid;gap:.6rem}
+.station{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 1rem;padding:.8rem 1rem;border:1px solid var(--soft);border-radius:8px}
+.station.top{border:2px solid var(--line)}
+.who{flex:1 1 14rem;min-width:0;display:grid}
+.who .brand,.who .addr,.who .meta{color:var(--mute);font-size:.9rem;overflow-wrap:anywhere}
+.closed{font-weight:700}
+.price{font-weight:800;font-variant-numeric:tabular-nums;font-size:1.1rem}
+details{margin-top:1.5rem}
+summary{list-style:none;width:100%;justify-content:space-between}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"▾"}
+details[open] summary::after{content:"▴"}
+details ul{margin-top:.75rem}
+footer{margin-top:3rem;padding-top:1rem;border-top:1px solid var(--soft);font-size:.85rem;color:var(--mute)}
+footer p{margin:.4rem 0}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+</style>
+</head>
+<body>
+<main>
+<div class="top"><nav class="lang" aria-label="Language"><span aria-current="page" lang="en"><span class="sr">English, </span>EN</span><a href="de/" hreflang="de" lang="de" data-lang="de"><span class="sr">Deutsch, </span>DE</a></nav></div>
+<h1>Munich Fuel Minimum</h1>
+<p class="lead">The cheapest Super E5, Super E10 and Diesel price per litre right now, from live MTS-K data.</p>
+
+<section class="box" aria-labelledby="area-h">
+<h2 id="area-h">Search area</h2>
+<p>Within 17 km of Marienplatz, Munich (48.1374° N, 11.5755° E).</p>
+<p class="small">This circle contains the whole Munich city area plus parts of neighbouring towns. Results are the cheapest within this search area, as reported to the MTS-K.</p>
+<div class="controls">
+<label class="field" for="radius">Distance from Marienplatz
+<select id="radius"><option value="5">up to 5 km</option><option value="10">up to 10 km</option><option value="17" selected>up to 17 km (whole search area)</option></select></label>
+<div><label class="check"><input type="checkbox" id="open-only" checked aria-describedby="open-note"> Open stations only</label>
+<p class="small" id="open-note">On by default: stations reported as closed at retrieval time are left out. Untick to include them.</p></div>
+</div>
+</section>
+
+<button type="button" id="search" class="btn primary">Show current prices</button>
+<p class="small">Prices are requested only when you click. Switching fuel type, distance or the open-only filter uses the same result.</p>
+<noscript><p class="status error">This page needs JavaScript to request current prices.</p></noscript>
+<div id="status" class="status" role="status" aria-live="polite"></div>
+
+<div role="tablist" aria-label="Fuel type">
+<button type="button" role="tab" data-fuel="e5" aria-selected="true" aria-controls="result">Super E5</button><button type="button" role="tab" data-fuel="e10" aria-selected="false" aria-controls="result" tabindex="-1">Super E10</button><button type="button" role="tab" data-fuel="diesel" aria-selected="false" aria-controls="result" tabindex="-1">Diesel</button>
+</div>
+<section id="result" role="tabpanel" aria-live="polite"></section>
+<section id="list"></section>
+
+<footer>
+<p class="small">Prices are compared to the tenth of a cent (three decimals, €/L). Missing, zero or implausible prices are ignored. All stations sharing the lowest price are shown.</p>
+<p>Price data: <a href="https://www.tankerkoenig.de/" rel="noopener">Tankerkönig</a> (<a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">CC BY 4.0</a>), based on reports to the <a href="https://www.bundeskartellamt.de/DE/Aufgaben/MarkttransparenzstelleFuerKraftstoffe/mtsk_node.html" rel="noopener">Markttransparenzstelle für Kraftstoffe (MTS-K)</a> of the Bundeskartellamt. No guarantee that prices are current or correct; the price at the pump applies.</p>
+<p>Source code on <a href="https://github.com/nastya-star/munich-fuel-min" rel="noopener">GitHub</a>.</p>
+</footer>
+</main>
+<script>document.querySelectorAll("[data-lang]").forEach(function(a){a.addEventListener("click",function(){try{localStorage.setItem("lang",a.getAttribute("data-lang"))}catch(e){}})})</script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

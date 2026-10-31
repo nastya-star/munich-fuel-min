@@ -1,0 +1,20 @@
+# Cloudflare Worker backend for https://nastya-star.github.io/munich-fuel-min/
+# Deploy: see ../README.md. The API key is a secret (wrangler secret put TANKERKOENIG_API_KEY),
+# never a [vars] entry.
+name = "munich-fuel-min"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+workers_dev = true
+
+[vars]
+ALLOWED_ORIGINS = "https://nastya-star.github.io"
+
+# One global Durable Object coordinates every upstream request (1 per minute for the key).
+[[durable_objects.bindings]]
+name = "PRICE_GATE"
+class_name = "PriceGate"
+
+# SQLite-backed Durable Objects are available on the Workers Free plan.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PriceGate"]
