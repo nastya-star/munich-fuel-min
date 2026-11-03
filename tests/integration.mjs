@@ -89,6 +89,25 @@ try {
   assert.equal((await get({ Origin: 'https://example.com' })).status, 403);
   console.log('PASS foreign Origin -> 403');
 
+  // 3b. Another origin inside the cached area -> answered from cache, distances from the new centre.
+  const inner = await fetch(`${api}?lat=48.14&lng=11.58&rad=3`).then((r) => r.json());
+  assert.equal(inner.coverage, 'full');
+  assert.equal(inner.source, 'cache');
+  assert.equal(upstreamCalls - base, 1);
+  assert.ok(inner.stations.every((s) => s.dist <= 3));
+  console.log('PASS origin inside cached area -> full coverage from cache, no upstream call');
+
+  // 3c. An uncovered origin within the minute -> global limit applies across origins.
+  const berlin = await fetch(`${api}?lat=52.52&lng=13.4&rad=5`);
+  assert.equal(berlin.status, 429);
+  assert.equal((await berlin.json()).error, 'rate_limited');
+  assert.equal(upstreamCalls - base, 1);
+  console.log('PASS uncovered origin within 60 s -> 429, no upstream call');
+
+  // 3d. Invalid areas are rejected before reaching the Durable Object.
+  for (const q of ['lat=99&lng=11&rad=5', 'lat=48.1&lng=11.5&rad=30', 'lat=abc&lng=11&rad=5']) assert.equal((await fetch(`${api}?${q}`)).status, 400, q);
+  console.log('PASS invalid lat/lng/radius -> 400');
+
   // 4. After a minute, upstream fails -> stale cache labelled, key redacted.
   mode = 'fail';
   await sleep(61_000);

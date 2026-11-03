@@ -1,41 +1,70 @@
 # Munich Fuel Minimum
 
-Shows the cheapest **Super E5**, **Super E10** and **Diesel** price per litre within 17 km of
-Marienplatz, Munich, using live [Tankerkönig](https://www.tankerkoenig.de/) data (MTS-K).
+Shows the cheapest **Super E5**, **Super E10** and **Diesel** price per litre around a starting point
+of your choice (default: Marienplatz, München), using live [Tankerkönig](https://www.tankerkoenig.de/) data (MTS-K).
 English and German.
 
 **Website:** https://nastya-star.github.io/munich-fuel-min/
 
-For each fuel *f* it shows p\*<sub>f</sub> = min<sub>i</sub> p<sub>if</sub>, taken over the stations in the search area that
-report a valid price for *f*. It is restricted to stations reported as open, unless the visitor unticks
-that filter. All stations tied at the minimum are listed. This version compares current prices only;
-price prediction and travel-cost optimisation are out of scope.
+For each fuel *f* it shows p*<sub>f</sub> = min<sub>i</sub> p<sub>if</sub> over the stations within the chosen radius of the
+starting point that report a valid price for *f* and, unless the visitor unticks the filter, are reported open.
+All stations tied at the minimum are listed. This compares current prices only; price prediction and travel-cost
+optimisation are out of scope. Distances are straight-line (Haversine), not road distances.
 
 ## How it works
 
 ```
-Browser (GitHub Pages, static)            Cloudflare Worker (free tier)            Tankerkönig
-docs/index.html, docs/de/index.html  ──▶  GET /api/prices                     ──▶  list.php?type=all
-docs/app.js (on click only)               └─ PriceGate Durable Object (one,
-                                             global): cache + 1 request/min
+Browser (GitHub Pages, static)           Cloudflare Worker (free tier)                 Tankerkönig
+docs/index.html, de/index.html     ──▶   GET /api/prices?lat&lng&rad              ──▶  list.php?type=all
+docs/app.js, core.js                     └─ PriceGate Durable Object (one, global):
+   │                                        area-aware cache + 1 request/min overall
+   └─ address search ──▶ OpenStreetMap Nominatim (on submit only)
 ```
 
-- **On demand only.** The page requests prices when the visitor clicks *Show current prices* or *Refresh*. There is no scheduled harvesting and no background polling. Fuel tabs, the distance selector and the open-only filter reuse the last response.
-- **One upstream call for everything.** A single `list.php` request (`type=all`, `rad=17`) returns all three fuel types. The minimum is calculated in the browser.
-- **Shared limit across all visitors and Worker instances.** Every request goes through one Durable Object (`idFromName('global')`), which Cloudflare guarantees is unique worldwide:
-  - Concurrent callers share one in-flight evaluation, so they never trigger duplicate requests.
-  - The time of the last request is written to durable storage *before* the call, so failed requests and restarts count too.
-  - Results are cached for 60 s. A new upstream request is made at most once per 60 s, whatever happens.
-- **Honest labelling.** Each response says whether it is `live` (fetched for this click) or `cache` (reused), when it was retrieved (shown in Europe/Berlin time), and whether it is `stale` (a refresh failed or was rate-limited), with the reason. Errors show no prices.
+- **Starting point.** Marienplatz is the default. Visitors can:
+  - search for an address, place or postcode (Nominatim, on submit only, at most once per second; typing only filters places they used before);
+  - or click *Use my location*. The browser asks for permission only then; if it is denied, the starting point stays as it was.
+
+  The choice and the radius (5/10/17 km) are kept in `localStorage`, so they survive the DE/EN switch.
+- **When prices are requested.** On opening the page, when a starting point is confirmed, when a larger radius needs more data, and on *Refresh*. Never per keystroke, never on a timer. Fuel cards, the open-only filter, a smaller radius, and list search/sort/filter all reuse the data already loaded.
+- **Privacy.** Before anything leaves the browser, the starting point is snapped to a 0.01° grid (about 1 km), and the radius is enlarged so the circle still contains the visitor’s own. The Worker snaps again for any client, so it never sees or stores a precise location. Exact distances and the Google Maps origin are computed in the browser from the precise point.
+- **Area-aware cache with one global limit.** All requests go through one Durable Object (`idFromName("global")`) and are evaluated one after another, so there are no races:
+  - **Covered:** a cached area younger than 60 s that fully contains the requested circle is reused. Distances are recomputed with Haversine from the requested centre, and only stations inside the circle are returned.
+  - **Not covered:** a new `list.php` request is made only if none was made in the last 60 s (for *any* area). The time is stored *before* the request, so failures and restarts count too.
+  - **Blocked by the limit:** the reply is clearly labelled. An older complete result of that area comes back as `stale`, results from overlapping areas as `coverage: "partial"` (the page then says it is *incomplete* and does not claim the cheapest), and otherwise a 429 with the waiting time.
+  - Cached areas are kept for at most 30 minutes, and there are at most 10.
+- **Directions.** *Route planen* opens `https://www.google.com/maps/dir/?api=1&origin=<start>&destination=<station>&travelmode=driving` (built with `URLSearchParams`). The origin is always the selected starting point and is never left out.
 - **The key stays on the server.** `TANKERKOENIG_API_KEY` is a Cloudflare Worker secret:
   - It is not in this repository, the Pages site, or any generated file.
-  - It is never returned to the browser or logged, and upstream error messages are redacted.
+  - It is never returned or logged, and upstream error messages are redacted.
   - The Worker only answers browsers on `https://nastya-star.github.io` (CORS plus an Origin check).
-- **Data handling.** No price data is committed to the repository, and there is no bulk download. Prices are compared as integer thousandths of a euro and shown with three decimals. Missing, `false`, `0` or implausible prices (outside 0.500–5.000 €/L) are excluded.
+  - It validates `lat`/`lng` (Germany only) and `rad` (1–25 km, the API maximum).
+- **Data handling.** No price data is committed and there is no bulk download. Prices are compared as integer thousandths of a euro and shown with three decimals. Missing, `false`, `0` or implausible prices are excluded. Station titles use the brand rather than legal company names.
 
-### Search area
+### API
 
-The search centre is Marienplatz (48.1374° N, 11.5755° E) with a radius of 17 km; the API maximum is 25 km. The farthest point of the Munich city boundary (OSM relation 62428) is 16.1 km from Marienplatz, so the circle contains the whole city area plus parts of neighbouring towns. Results are described as *the cheapest within this search area*. Visitors can narrow the distance to 5 or 10 km; that is filtered locally, with no extra request.
+`GET /api/prices?lat=48.14&lng=11.58&rad=17.5`. Without parameters, the default area is used (Marienplatz, 17 km).
+
+| Field | Meaning |
+| --- | --- |
+| `source` | `live` or `cache` |
+| `coverage` | `full` or `partial` |
+| `stale` | true if older than 60 s, or partial |
+| `fetchedAt` | retrieval time |
+| `query` | the snapped area |
+| `nextRequestInSeconds` | seconds until a new upstream request is possible |
+| `stations` | normalised stations; `dist` from the query centre |
+| `error`, `retryAfterSeconds` | when fresh data was not possible |
+
+### Geocoding
+
+Address search uses the public [Nominatim](https://nominatim.org/) API of the OpenStreetMap Foundation. No registration, key or cost is involved. It follows the [usage policy](https://operations.osmfoundation.org/policies/nominatim/):
+- requests are made only on an explicit search, never for autocomplete;
+- at most one request per second per visitor;
+- the browser sends the site as Referer;
+- the site credits © OpenStreetMap contributors (ODbL).
+
+If traffic ever grows beyond occasional use, switch `GEOCODER` in `docs/app.js` to a dedicated provider.
 
 ### Terms
 
@@ -46,7 +75,7 @@ These follow [Tankerkönig's API terms](https://creativecommons.tankerkoenig.de/
 - the key is never published;
 - CC BY 4.0 attribution to Tankerkönig, with the MTS-K named as the data source.
 
-The terms also ask public sites not to filter results unless the user explicitly wants it. The open-only filter is therefore a visible, labelled checkbox that visitors can untick, and the distance filter is chosen by the visitor.
+The terms also ask public sites not to filter results unless the user explicitly wants it. The open-only filter is therefore a visible, labelled checkbox that visitors can untick, and the radius is chosen by the visitor. Loading prices for the default or saved starting point when the page opens is a visitor action (opening the page); it is limited by the same global 1-request-per-minute gate.
 
 ## Repository layout
 
@@ -56,7 +85,8 @@ The terms also ask public sites not to filter results unless the user explicitly
 | `build.mjs` | Generates both HTML pages from one template: `node build.mjs` |
 | `worker/` | Cloudflare Worker + Durable Object (`src/index.js`, `src/gate.js`, `src/normalize.js`, `wrangler.toml`) |
 | `tests/*.test.mjs` | Unit tests: minimum, ties, unavailable fuels, closed stations, price validation, cache, 1/min limit, concurrency (`node --test "tests/*.test.mjs"`) |
-| `tests/integration.mjs` | Runs the real Worker in workerd against a mock list.php: 40 concurrent requests → 1 upstream call, cache, stale labelling, key redaction, Origin check (`node tests/integration.mjs`, about 2.5 min) |
+| `tests/integration.mjs` | Runs the real Worker in workerd against a mock list.php: 40 concurrent requests → 1 upstream call, cache, origin inside the cached area, uncovered origin → 429, invalid areas → 400, stale labelling, key redaction, Origin check (`node tests/integration.mjs`, about 2.5 min) |
+| `tests/e2e.mjs` | Browser test in headless Chrome with mocked API and geocoder: default location, address search, geolocation allowed/denied, origin-aware directions, radius and coverage, partial/rate-limit states, list sorting/filtering/show more, EN/DE switch, mobile overflow and touch targets (`node tests/e2e.mjs`) |
 | `tools/inspect.mjs` | Local, developer-only data inspector (not published): raw JSON, table, field list, search, filters and CSV export |
 
 ## Data and fuel types
@@ -111,6 +141,8 @@ npx wrangler deploy                             # prints https://munich-fuel-min
 
 Then set `API_BASE` in `docs/app.js` to the printed URL (it contains no secret), commit and push.
 
+**Upgrading to the location-aware version:** deploy the Worker first (`npx wrangler deploy` in `worker/`). It still answers requests without parameters exactly as before, so the old page keeps working. Then merge the frontend into `main`. The new page needs the new Worker: with the old Worker, every result would be labelled incomplete. No new secrets or bindings are needed; the Durable Object migration is unchanged.
+
 **Live backend:** `https://munich-fuel-min.stepanenkon010.workers.dev/api/prices`. If `wrangler deploy` fails with *code 10063*, the account has no workers.dev subdomain yet: open **Workers & Pages** in the Cloudflare dashboard once, then deploy again. Run all `wrangler` commands from `worker/` so `wrangler.toml` (Durable Object binding and migration) is picked up.
 
 Check that it works: `curl -s https://munich-fuel-min.<subdomain>.workers.dev/api/prices | head -c 300`. A response with `"ok":true` and stations means the key is active. `upstream_key_rejected` means the key is not activated yet: confirm the email from Tankerkönig.
@@ -122,6 +154,7 @@ Free-plan usage is tiny: each click is one Worker request plus one Durable Objec
 ```bash
 node build.mjs                    # regenerate docs/index.html and docs/de/index.html
 node --test "tests/*.test.mjs"    # unit tests
+node tests/e2e.mjs                # browser test (needs Google Chrome; CHROME_PATH to override)
 cd worker && npm ci && cd .. && node tests/integration.mjs   # Worker integration test (mock upstream)
 ```
 
