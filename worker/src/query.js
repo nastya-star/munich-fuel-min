@@ -26,8 +26,9 @@ export function snapArea(lat, lng, radKm) {
  * @returns {{ok: true, area: {lat:number,lng:number,rad:number}} | {ok: false, error: string}}
  */
 export function parseArea(sp) {
-  // No parameters: the default area, exactly (backwards compatible with older pages).
-  if (!sp.has('lat') && !sp.has('lng') && !sp.has('rad')) return { ok: true, area: { ...DEFAULT_AREA } };
+  // No parameters: the default area, snapped exactly as the page snaps it, so requests with and
+  // without parameters share one cache entry (48.14, 11.58, 17.5 km contains Marienplatz + 17 km).
+  if (!sp.has('lat') && !sp.has('lng') && !sp.has('rad')) return { ok: true, area: snapArea(DEFAULT_AREA.lat, DEFAULT_AREA.lng, DEFAULT_AREA.rad) };
   const num = (k) => (sp.has(k) && sp.get(k).trim() !== '' ? Number(sp.get(k)) : NaN);
   const lat = num('lat');
   const lng = num('lng');

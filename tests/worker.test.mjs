@@ -46,8 +46,11 @@ test('classifyUpstreamError', () => {
 
 const sp = (o) => new URLSearchParams(o);
 
-test('no parameters -> exact default area (Marienplatz, 17 km)', () => {
-  assert.deepEqual(parseArea(sp({})), { ok: true, area: { ...DEFAULT_AREA } });
+test('no parameters -> default area snapped like the page does (shared cache entry)', () => {
+  const r = parseArea(sp({}));
+  assert.deepEqual(r, { ok: true, area: { lat: 48.14, lng: 11.58, rad: 17.5 } });
+  assert.deepEqual(r, parseArea(sp({ lat: '48.1374', lng: '11.5755', rad: '17' })));
+  assert.ok(covers(r.area, DEFAULT_AREA), 'still contains Marienplatz + 17 km');
 });
 
 test('coordinates are snapped to 0.01 deg and the radius enlarged so the request stays covered', () => {
