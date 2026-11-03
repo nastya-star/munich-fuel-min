@@ -1,0 +1,2 @@
+# The approved article is stored byte-for-byte; never convert its line endings.
+content/*.md -text
