@@ -262,3 +262,9 @@ test('colours: per fuel - the same stations colour differently for E10 and Diese
   assert.equal(priceColors(s, 'e10', { complete: true }).byId.get('b').tier, 'min');
   assert.equal(priceColors(s, 'diesel', { complete: true }).byId.get('b').tier, 'none');
 });
+
+test('HTML-escaped station names from MTS-K are decoded for display', () => {
+  assert.equal(prettify('OIL! tank &amp; go Automatentankstelle'), 'OIL! tank & go Automatentankstelle');
+  assert.equal(stationSubtitle({ name: 'OIL! tank &amp; go Karlsfeld', brand: 'OIL!' }), 'OIL! tank & go Karlsfeld');
+  assert.equal(prettify('&lt;b&gt;'), '<b>'); // shown via textContent, never parsed as HTML
+});

@@ -162,8 +162,13 @@ const LEGAL = /\b(gmbh|mbh|ag|kg|ohg|gbr|ug|e\.\s?k\.?|co\.?|inh\.?|c\/o|ltd|se)
 export const isLegalName = (s) => LEGAL.test(s || '');
 
 /** "ARAL" -> "Aral", "AGIP ENI" -> "Agip ENI"; short all-caps words (BK, JET, ENI) stay as they are. */
+// Some MTS-K names arrive HTML-escaped ("tank &amp; go"); decode the common entities (output is
+// always set via textContent, so this cannot inject markup).
+const ENTITIES = { amp: '&', quot: '"', apos: "'", '#39': "'", lt: '<', gt: '>', nbsp: ' ' };
+const decode = (s) => s.replace(/&(amp|quot|apos|#39|lt|gt|nbsp);/g, (_, e) => ENTITIES[e]);
+
 export function prettify(s) {
-  const t = String(s || '').trim().replace(/\s+/g, ' ');
+  const t = decode(String(s || '')).trim().replace(/\s+/g, ' ');
   if (!t || t !== t.toLocaleUpperCase('de')) return t;
   return t
     .split(/(\s|-|\/)/)
