@@ -131,6 +131,8 @@ input::placeholder{color:#8f8b83}
 .linkbtn{background:none;border:0;padding:.3rem 0;color:var(--mute);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-size:.88rem;min-height:2.4rem}
 .linkbtn:hover{color:var(--fg)}
 /* comparison */
+/* Link to the article (same English article from both languages) */
+.howto{margin:1.5rem 0 0}
 details.more{margin-top:1.5rem;border:1px solid var(--soft);border-radius:var(--r)}
 details.more>summary{display:flex;justify-content:space-between;align-items:center;min-height:3rem;padding:.4rem .9rem;font:400 1.15rem var(--serif);cursor:pointer;list-style:none}
 details.more>summary::-webkit-details-marker{display:none}
@@ -232,6 +234,8 @@ footer details summary{cursor:pointer;color:var(--fg);min-height:2.4rem;display:
 <button type="button" class="btn small" id="show-more" hidden>Show more</button>
 </div>
 </details>
+
+<p class="howto"><a class="btn" href="https://nastya-star.github.io/munich-fuel-min/how-it-works.html">How does it work?</a></p>
 
 <footer>
 <details><summary>How it works</summary><p>Prices for Super E5, Super E10 and Diesel are retrieved from Tankerkönig when you open the page, choose a starting point or click Refresh. For all visitors together, at most one new request is made per minute; in between, recent results are reused and labelled with their retrieval time. Moving or zooming the map and switching fuel never request new data.</p><p>The cheapest price is the lowest price in €/L (to a tenth of a cent) among stations in the chosen radius that report a valid price and – unless you untick the filter – are reported as open. All stations with that price are shown and marked green with a check mark on the map. Every higher price is coloured from yellow (next cheapest) to red (most expensive) by its rank among the prices present; stations without a price for the fuel are grey. If the data for your area is incomplete, nothing is marked green.</p><p>Distances are straight-line distances from your starting point, not driving distances. Directions opens Google Maps from your starting point to the station.</p><p>Your starting point is used in your browser only. The server receives it rounded to about 1 km and does not store your exact location.</p></details>

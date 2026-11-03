@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>How does it work? · Munich Fuel Minimum</title>
+<meta name="description" content="A transparent fuel-price comparison system for Munich, designed for accuracy, privacy and reproducibility.">
+<meta name="theme-color" content="#111111">
+<meta name="color-scheme" content="dark">
+<link rel="canonical" href="https://nastya-star.github.io/munich-fuel-min/how-it-works.html">
+<link rel="alternate" hreflang="en" href="https://nastya-star.github.io/munich-fuel-min/how-it-works.html">
+<link rel="alternate" hreflang="de" href="https://nastya-star.github.io/munich-fuel-min/de/how-it-works.html">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23111'/%3E%3Cpath d='M10 25V9a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M9 25h12M12.5 11h5v4h-5zM20 14h1.5a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 0 3 0V12l-3-3' fill='none' stroke='%23F5F3EE' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root{--bg:#111111;--fg:#F5F3EE;--mute:#B9B5AC;--line:rgba(245,243,238,.75);--soft:rgba(245,243,238,.35);--faint:rgba(245,243,238,.16);--tile:#181818;--serif:Georgia,"Times New Roman",Times,serif;--sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;--r:6px}
+*{box-sizing:border-box}
+html{background:var(--bg);color-scheme:dark;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 1rem/1.65 var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+main{max-width:44rem;margin:0 auto;padding:1rem 1.1rem 3rem}
+a{color:inherit;text-decoration-color:var(--soft);text-underline-offset:3px}
+a:hover{text-decoration-color:currentColor}
+:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+.nav{display:flex;flex-wrap:wrap;gap:.2rem 1.4rem}
+.nav a{display:inline-flex;align-items:center;min-height:2.75rem;color:var(--mute);text-decoration:none;font-size:.92rem}
+.nav a:hover{color:var(--fg);text-decoration:underline;text-underline-offset:3px}
+.nav.bottom{margin-top:2rem;padding-top:1rem;border-top:1px solid var(--faint)}
+header{text-align:center;margin:2rem 0 2.2rem}
+h1{margin:0 0 .6rem;font:400 clamp(2rem,7vw,2.75rem)/1.12 var(--serif);letter-spacing:.005em}
+.sub{margin:0 auto;max-width:34rem;color:var(--mute)}
+.card{border:1px solid var(--faint);border-radius:var(--r);padding:1.35rem 1.25rem;margin-bottom:1rem}
+.card.end{background:var(--tile)}
+h2{margin:0 0 .9rem;font:400 1.45rem/1.25 var(--serif);display:flex;gap:.65rem;align-items:baseline}
+h2 span,h3 span{color:var(--mute);font:600 .85rem var(--sans);font-variant-numeric:tabular-nums;letter-spacing:.06em}
+h3{margin:1.5rem 0 .45rem;font:400 1.12rem/1.3 var(--serif)}
+h3 span{margin-right:.15rem}
+p{margin:0 0 .9rem}
+.card p:last-child{margin-bottom:0}
+strong{font-weight:600}
+code{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-size:.9em;padding:.05em .3em;border:1px solid var(--faint);border-radius:4px}
+/* maths: native MathML */
+math{font-family:"Cambria Math","STIX Two Math","Latin Modern Math",math;font-size:1.06em}
+.eq{margin:1.1rem 0 1.2rem;padding:1.1rem .8rem;text-align:center;overflow-x:auto;background:var(--tile);border-radius:var(--r)}
+/* The box is drawn on a wrapper: changing the CSS display of <math> itself breaks MathML layout. */
+.eq .box{display:inline-block;padding:.4em .8em;border:1px solid var(--line);border-radius:var(--r)}
+.eq math{font-size:1.5em}
+hr{border:0;border-top:1px solid var(--faint);margin:2rem 0 1.6rem}
+.closing{text-align:center;padding:0 .5rem}
+.closing p{margin-bottom:1rem}
+.sign{line-height:1.5}
+@media(max-width:30rem){.card{padding:1.1rem .95rem}.eq .box{padding:.35em .5em}.eq math{font-size:1.2em}}
+</style>
+</head>
+<body>
+<main>
+<nav class="nav" aria-label="Back navigation" data-chrome><a href="https://nastya-star.github.io/anastasiia-stepanenko/">← Back to my website</a><a href="https://nastya-star.github.io/munich-fuel-min/">← Back to fuel minimisation</a></nav>
+<article>
+<header>
+<h1>How does it work?</h1>
+<p class="sub"><em>A transparent fuel-price comparison system for Munich, designed for accuracy, privacy and reproducibility.</em></p>
+</header>
+<section class="card" aria-labelledby="s1">
+<h2 id="s1"><span>01</span> Introduction</h2>
+<p>Hi, we already know each other. I'm Anastasiia.</p>
+<p>I study mathematics, and since 2022, I've been working on optimization problems, usually beginning with questions I wanted to answer for myself: What is the cheapest route? How can I travel somewhere in the shortest possible time? How can I feed my cats as well as possible while spending as little as possible? Eventually, I began wondering whether I could use the same approach to solve problems for other people.</p>
+<p>When I started at TUM, I met many students, and quite a few began asking for my contact details. I thought it would be useful to have a website where they could find me, but I also wanted to give them something worth visiting. During our introductory days, an online questionnaire asked what everyone was looking forward to most, and beer received the most attention. Later, when we went out together, I noticed that Radler was a particular favorite. So I decided to find the cheapest Radler in Munich and Garching. It seemed an appropriate way to introduce myself: other people brought beer to the gathering, while I brought an optimization problem.</p>
+<p>But Munich is full of people who have already survived their introductory days. I was meeting founders, professionals and people whose everyday concerns extended beyond the price of Radler. I wanted to create something useful for them too. The question was what.</p>
+<p>The answer came during a Female Founder Breakfast in Munich. I was talking to one of the founders when she mentioned that a website showing the cheapest petrol stations would be useful to her. I liked the idea because petrol prices vary between stations and change throughout the day, which makes the choice of where to refuel a small but recurring decision. More importantly, someone had just told me what she actually needed. So I decided to build it.</p>
+<p>The result is <strong>Munich Fuel Minimum</strong>, a website that compares real petrol prices and finds the cheapest stations around a selected location. What started as a conversation over breakfast became a mathematical problem, an API integration and an interactive map. Let me explain how it works.</p>
+</section>
+<section class="card" aria-labelledby="s2">
+<h2 id="s2"><span>02</span> The problem</h2>
+<p>Suppose we want to refuel somewhere in Munich. We have a particular fuel type in mind, a starting location and some distance we are willing to travel. Within that area, different petrol stations offer different prices, so our task is to identify the station at which one liter costs the least. We can express this as a <strong>discrete minimization problem</strong>, since we are choosing from a finite collection of petrol stations.</p>
+<h3><span>02.1</span> Input</h3>
+<p>Our model begins with three kinds of information: the geographical area selected by the user, the fuel type being compared and the prices reported by petrol stations. Each station has an identifier, a name, geographical coordinates, a reported opening status and available prices for Super E5, Super E10 and Diesel. The user selects a starting location and a search radius, which together define the geographical area in which we look for eligible stations. The application also offers a filter for stations reported as open, so the user can decide which stations should participate in the comparison.</p>
+<p>For example, a person near Marienplatz may want to find the cheapest E10 within five kilometers, while someone else may be interested in Diesel within seventeen kilometers. Although the inputs differ, both questions lead to the same mathematical formulation.</p>
+<h3><span>02.2</span> Objective function</h3>
+<p>For a selected fuel type, location and search radius, we want to find the lowest reported price per liter:</p>
+<div class="eq"><span class="box"><math display="block" data-tex="DISPLAY"><msubsup><mi>p</mi><mi>f</mi><mo>*</mo></msubsup><mo stretchy="false">(</mo><mi>x</mi><mo>,</mo><mi>r</mi><mo>,</mo><mi>t</mi><mo stretchy="false">)</mo><mo>=</mo><munder><mo movablelimits="false">min</mo><mrow><mi>i</mi><mo>∈</mo><msub><mi>S</mi><mrow><mi>f</mi></mrow></msub><mo stretchy="false">(</mo><mi>x</mi><mo>,</mo><mi>r</mi><mo>,</mo><mi>t</mi><mo stretchy="false">)</mo></mrow></munder><msub><mi>p</mi><mrow><mi>i</mi><mo>,</mo><mi>f</mi></mrow></msub><mo stretchy="false">(</mo><msub><mi>t</mi><mrow><mi>i</mi></mrow></msub><mo stretchy="false">)</mo></math></span></div>
+<p>Here, <math data-tex="i"><mi>i</mi></math> identifies an individual petrol station and <math data-tex="f"><mi>f</mi></math> represents the fuel type: E5, E10 or Diesel. The point <math data-tex="x"><mi>x</mi></math> is the starting location selected by the user, while <math data-tex="r"><mi>r</mi></math> represents the search radius in kilometers. We use <math data-tex="t"><mi>t</mi></math> for the time at which the comparison is performed and <math data-tex="t_i"><msub><mi>t</mi><mrow><mi>i</mi></mrow></msub></math> for the time at which station <math data-tex="i"><mi>i</mi></math>'s price was retrieved. The expression <math data-tex="p\_{i,f}(t_i)"><msub><mi>p</mi><mrow><mi>i</mi><mo>,</mo><mi>f</mi></mrow></msub><mo stretchy="false">(</mo><msub><mi>t</mi><mrow><mi>i</mi></mrow></msub><mo stretchy="false">)</mo></math> is the reported price per liter for fuel <math data-tex="f"><mi>f</mi></math> at station <math data-tex="i"><mi>i</mi></math>, expressed in euros.</p>
+<p>The set <math data-tex="S_f(x,r,t)"><msub><mi>S</mi><mrow><mi>f</mi></mrow></msub><mo stretchy="false">(</mo><mi>x</mi><mo>,</mo><mi>r</mi><mo>,</mo><mi>t</mi><mo stretchy="false">)</mo></math> contains the stations within the chosen radius that have a valid reported price for the selected fuel. When the open-stations filter is enabled, this set is restricted to stations reported as open. Finally, <math data-tex="p_f^\*(x,r,t)"><msubsup><mi>p</mi><mi>f</mi><mo>*</mo></msubsup><mo stretchy="false">(</mo><mi>x</mi><mo>,</mo><mi>r</mi><mo>,</mo><mi>t</mi><mo stretchy="false">)</mo></math> represents the minimum reported price per liter among these eligible stations, which is the value we are looking for.</p>
+<p>There is one detail worth considering. Suppose three stations report E10 prices of €1.729, €1.689 and €1.689 per liter. The minimum is €1.689, but two stations attain it. In optimization, we distinguish between the <strong>optimal objective value</strong>, which is the minimum price, and the <strong>optimal solutions</strong>, which are the stations attaining that value. The latter form the set of minimizers, often expressed using <math data-tex="\operatorname\*{arg,min}"><mi mathvariant="normal">arg</mi><mspace width="0.1667em"/><mi mathvariant="normal">min</mi></math>. I wanted the website to preserve this distinction, so it identifies all stations sharing the minimum, leaving the visitor to choose whichever is more convenient.</p>
+</section>
+<section class="card" aria-labelledby="s3">
+<h2 id="s3"><span>03</span> The algorithm</h2>
+<p>Now that we know what we want to minimize, we need a way to find it. Fortunately, this problem has a straightforward solution. Imagine a row of petrol stations, each with its price written on a piece of paper. We begin with the first eligible price and remember it as our current minimum. Then we examine each subsequent price, replacing the current minimum whenever we find something cheaper and remembering every station whose price equals the minimum. Once we have examined all eligible stations, we have both the lowest price and the collection of stations offering it.</p>
+<p>This procedure is called <strong>Linear Minimum Search</strong>, and its time complexity is <math data-tex="O(n)"><mi>O</mi><mo stretchy="false">(</mo><mi>n</mi><mo stretchy="false">)</mo></math>, where <math data-tex="n"><mi>n</mi></math> represents the number of eligible stations. The number of comparisons grows linearly with the number of stations, making the algorithm suitable for the geographical areas considered by the application. We apply the procedure independently to Super E5, Super E10 and Diesel, using the corresponding prices from the same collection of station records.</p>
+<p>Before calculating the minimum, the application determines which stations belong to the selected search area. It uses the Haversine formula to calculate geographical distances between the starting point and each station from their latitude and longitude. The eligible stations are then selected according to the distance, fuel availability and opening-status filter. Prices are represented internally as integer thousandths of a euro, so €1.729 becomes 1729, allowing comparisons at the precision provided by the data. Once the minimum has been calculated, the application uses the same station records to produce the price cards, station list and interactive map.</p>
+</section>
+<section class="card" aria-labelledby="s4">
+<h2 id="s4"><span>04</span> Data origin</h2>
+<p>The application uses <strong>real fuel-price data</strong> obtained through the <a href="https://creativecommons.tankerkoenig.de/" rel="noopener">Tankerkönig API</a>. In Germany, petrol stations report fuel-price changes to the Markttransparenzstelle für Kraftstoffe, abbreviated as MTS-K, which is operated by the Bundeskartellamt. Tankerkönig provides access to this information through an API, making it possible to retrieve reported prices for Super E5, Super E10 and Diesel together with information about the stations offering them.</p>
+<p>An API response contains a collection of petrol stations, each described by several fields, including its identifier, name, brand, address, geographical coordinates, reported opening status and fuel prices. The application converts these records into a consistent internal format before using them in the minimization. Station identifiers are preserved, prices are converted into integer thousandths of a euro, and retrieval timestamps are associated with the observations. This allows prices from individual stations to be compared and displayed together with information about when they were retrieved.</p>
+<p>Some petrol stations offer only certain fuel types, while other records contain missing or unavailable prices. The application represents these values as <code>null</code> and includes each station in the minimization only for fuels with a valid reported price. For example, a station with an available Diesel price can participate in the Diesel comparison even when its E5 price is unavailable. The same station can still appear on the map, where the unavailable fuel price receives a separate visual representation. This approach allows the application to work with the actual information returned by Tankerkönig and construct the appropriate set of eligible stations for each fuel type.</p>
+</section>
+<section class="card" aria-labelledby="s5">
+<h2 id="s5"><span>05</span> How a request travels through the system</h2>
+<p>We now have a mathematical objective, an algorithm and a source of real prices. The remaining task is to connect them in a way that someone can use without knowing anything about optimization. I wanted the visitor to be able to open the website, choose a location, compare the prices and decide where to refuel, so the interaction follows that sequence.</p>
+<p>When you open <a href="https://nastya-star.github.io/munich-fuel-min/">Munich Fuel Minimum</a>, the website begins with Marienplatz in Munich as its default starting point, or restores the location previously saved in your browser. The application displays three fuel-price cards, an interactive map and the options for selecting a search area. You can enter an address, town or postcode and press Search, after which the website uses OpenStreetMap's Nominatim service to suggest matching locations. Once you select a place, it becomes your starting point. Alternatively, the <strong>Use my location</strong> button asks your browser for permission to obtain your current location. You can then select a radius of 5, 10 or 17 kilometers and decide whether the comparison should include all stations or only those reported as open.</p>
+<p>The website retrieves the relevant station data and calculates the minimum prices for E5, E10 and Diesel. The price cards display these results, while the map initially shows stations colored according to the selected fuel. Clicking another fuel card changes the comparison shown on the map, allowing you to examine the three fuel types using the information already retrieved. Selecting a station marker opens its details, including the address, reported price, distance from the starting point and retrieval time. The station list offers another way to explore the same information: you can search by name or brand, sort by price or distance, and select a station to locate it on the map. Once you have chosen a station, the Directions button opens Google Maps with your starting point and the selected petrol station as the destination.</p>
+<h3><span>05.1</span> The architecture</h3>
+<p>Behind this interaction, the system follows a sequence of components: <strong>GitHub Pages → Cloudflare Worker → Tankerkönig API → price calculation → interactive map</strong>. The website itself is built with HTML, CSS and JavaScript and hosted on GitHub Pages. When prices are needed, the browser sends a request to a Cloudflare Worker, which communicates with Tankerkönig using an API key stored as a server-side secret. The Worker retrieves and processes the station information, while the browser uses the returned records to calculate the minimum prices and display them through the interface.</p>
+<p>There is an important technical condition: <strong>Tankerkönig specifies a limit of one API request per 60 seconds for the API key</strong>. Since multiple visitors can use the website simultaneously, the requests need to be coordinated. For this purpose, I use a Cloudflare Durable Object, which manages a shared request limit and a cache of previously retrieved station data. When a visitor requests an area covered by suitable recent observations, the system reuses them. When new information is needed and another upstream request is permitted, the Worker retrieves fresh data from Tankerkönig. This allows different visitors to share the same API connection while the system keeps track of request frequency, geographical coverage and retrieval times.</p>
+<p>The implementation therefore combines <strong>HTML and CSS</strong> for the interface, <strong>JavaScript</strong> for price processing and minimization, <strong>GitHub Pages</strong> for hosting, <strong>Cloudflare Workers and Durable Objects</strong> for API communication and request coordination, and <strong>Leaflet with OpenStreetMap</strong> for geographical visualization. The code is available in my <a href="https://github.com/nastya-star/munich-fuel-min" rel="noopener">public GitHub repository</a>, where the mathematical calculations and technical implementation can be inspected and reproduced.</p>
+</section>
+<section class="card" aria-labelledby="s6">
+<h2 id="s6"><span>06</span> Privacy</h2>
+<p>The application needs a starting location to find nearby petrol stations, which raises an interesting question: how much location information does each component actually need? The browser needs the location selected by the visitor to calculate distances and generate directions, while the API request can work with an approximate geographical area. I therefore separated these two uses of location information so that the precise starting point remains available for calculations in the browser, while the coordinates sent to the Cloudflare Worker are rounded to a grid of approximately one kilometer.</p>
+<p>The search radius is adjusted to account for the change introduced by rounding, allowing the Worker to request a suitable area around the approximate coordinates. The Worker also normalizes incoming coordinates, ensuring that the server-side request and cache use a consistent geographical representation. Meanwhile, the browser can calculate distances from the visitor's actual selected starting point and pass that point to Google Maps when generating directions. Address searches are handled through Nominatim, which resolves the place entered by the user into geographical coordinates. The selected starting point and radius can also be saved in the browser's local storage, making it possible to return to the same search area on a later visit.</p>
+<p>What I liked about this arrangement was that it followed naturally from the architecture. The location used to retrieve prices and the location used to calculate a visitor's journey serve different purposes, so they can be handled separately.</p>
+</section>
+<section class="card" aria-labelledby="s7">
+<h2 id="s7"><span>07</span> Visualization</h2>
+<p>Once the minimum has been calculated, we have the answer to our mathematical problem, but I wanted to make the result understandable at a glance. A list of prices tells us which station is cheapest, while a map shows where those stations are and how their prices compare across the selected area. I used Leaflet and OpenStreetMap to display the stations, assigning each marker a color according to the reported price for the chosen fuel. Stations attaining the minimum are marked in <strong>green with a check mark</strong>, while higher prices are represented from <strong>yellow through orange to red</strong>. Stations with an unavailable price for the selected fuel are shown in <strong>grey</strong>, and stations reporting the same price receive the same color.</p>
+<p>The color scale is calculated from the distinct prices present in the comparison. For example, if several stations report €1.689, they receive the same color, while the next higher reported price is assigned the next position in the scale. When the visitor switches from E10 to Diesel, the application recalculates the colors using the Diesel prices, allowing the same map to represent a different minimization problem. When the available data covers only part of the requested area, the map identifies the comparison as incomplete and represents the observed prices without highlighting a confirmed minimum for the entire search area. In this way, the visual representation follows the mathematical result and the geographical coverage of the underlying observations.</p>
+<p>I also connected the map to the station list so that both views describe the same collection of stations. Clicking a marker opens its details, while selecting a station in the list highlights it on the map. The visitor can examine stations, compare prices and switch fuel types using the data already loaded. What began as a minimum over a set of prices becomes a geographical comparison that can be used to choose an actual destination.</p>
+</section>
+<section class="card" aria-labelledby="s8">
+<h2 id="s8"><span>08</span> Future improvements</h2>
+<p>The current project solves a static minimization problem using the fuel prices retrieved from Tankerkönig. I would like to extend it by introducing <strong>price prediction</strong>, since petrol prices change throughout the day and the cheapest station at one moment may offer a different price later. Instead of asking only where fuel is currently cheapest, we could investigate where it is likely to be cheapest in thirty minutes, several hours or the following day. This would introduce time as an additional decision variable and turn the original comparison into a more interesting optimization problem.</p>
+<p>For forecasting, I would like to compare several approaches, beginning with linear regression and classical time-series models such as ARIMA. I am also interested in gradient-boosted decision trees, including LightGBM and XGBoost, and probabilistic models that estimate the timing of price changes. To investigate these methods, I would need historical fuel-price observations, preferably including the timestamps and values of individual price changes. I am exploring access to historical data through Tankerkönig so that I can reconstruct price histories, examine patterns at individual stations and evaluate how well different models predict future prices.</p>
+<p>With a forecasting model, we could choose both a station and a time to refuel. For example, the predicted price <math data-tex="\widehat p\_{i,f}(\tau)"><msub><mover accent="true"><mi>p</mi><mo>^</mo></mover><mrow><mi>i</mi><mo>,</mo><mi>f</mi></mrow></msub><mo stretchy="false">(</mo><mi>τ</mi><mo stretchy="false">)</mo></math> could describe the expected price of fuel <math data-tex="f"><mi>f</mi></math> at station <math data-tex="i"><mi>i</mi></math> at a future time <math data-tex="\tau"><mi>τ</mi></math>, allowing us to compare different stations and refueling times. We could then introduce additional costs, such as the distance to each station, the fuel consumed during the journey and the value of the driver's time. The original minimum-price problem would gradually develop into a decision-support system for choosing <strong>where and when to refuel</strong>.</p>
+<p>I find this development particularly interesting because it began with a question someone asked me over breakfast. A small everyday problem led to a mathematical formulation, a working website and several possibilities for further research. That is one of the reasons I enjoy optimization: a simple question can become much more interesting once we begin examining it carefully.</p>
+</section>
+<section class="card end" aria-labelledby="s9">
+<h2 id="s9">Have a problem worth optimizing?</h2>
+<p>I collect interesting optimization problems from mathematics, research, business and everyday conversations. Some begin with a complicated technical question, while others appear when someone mentions an inconvenience they would like to solve. If you have a problem involving costs, resources, planning or decisions, I would be interested to hear about it. Perhaps we can turn it into another mathematical model, and perhaps it will become my next little project.</p>
+<p><a href="https://www.linkedin.com/in/anastasiia-stepanenko-1a0871327/" rel="noopener">Let's talk optimization on LinkedIn</a>.</p>
+</section>
+<hr>
+<div class="closing">
+<p>Thank you for reaching another mathematical corner of my website. I hope the next time you need petrol, the comparison will be a little easier and the journey a little cheaper.</p>
+<p class="sign">Yours, admiringly,<br><strong>Anastasiia</strong></p>
+<p><em>P.S. Made with love.</em></p>
+</div>
+</article>
+<nav class="nav bottom" aria-label="Back navigation (end of article)" data-chrome><a href="https://nastya-star.github.io/anastasiia-stepanenko/">← Back to my website</a><a href="https://nastya-star.github.io/munich-fuel-min/">← Back to fuel minimisation</a></nav>
+</main>
+</body>
+</html>

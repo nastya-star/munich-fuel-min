@@ -2,7 +2,8 @@
 // from one template. Run after editing: node build.mjs. Dynamic text lives in docs/app.js.
 // Visual identity follows https://nastya-star.github.io/anastasiia-stepanenko/ (same tokens).
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { renderArticlePage } from './article.mjs';
 
 const SITE = 'https://nastya-star.github.io/munich-fuel-min/';
 const RADII = [5, 10, 17]; // keep in sync with docs/core.js
@@ -40,6 +41,8 @@ const T = {
     statusClosed: 'Closed',
     fuelLabel: 'Fuel',
     showMore: 'Show more',
+    howBtn: 'How does it work?',
+    howPath: 'how-it-works.html',
     noscript: 'This page needs JavaScript to request current prices.',
     howTitle: 'How it works',
     how: [
@@ -84,6 +87,8 @@ const T = {
     statusClosed: 'Geschlossen',
     fuelLabel: 'Kraftstoff',
     showMore: 'Mehr anzeigen',
+    howBtn: 'Wie funktioniert es?',
+    howPath: 'de/how-it-works.html',
     noscript: 'Diese Seite benötigt JavaScript, um aktuelle Preise abzufragen.',
     howTitle: 'So funktioniert es',
     how: [
@@ -215,6 +220,8 @@ input::placeholder{color:#8f8b83}
 .linkbtn{background:none;border:0;padding:.3rem 0;color:var(--mute);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-size:.88rem;min-height:2.4rem}
 .linkbtn:hover{color:var(--fg)}
 /* comparison */
+/* Link to the article (same English article from both languages) */
+.howto{margin:1.5rem 0 0}
 details.more{margin-top:1.5rem;border:1px solid var(--soft);border-radius:var(--r)}
 details.more>summary{display:flex;justify-content:space-between;align-items:center;min-height:3rem;padding:.4rem .9rem;font:400 1.15rem var(--serif);cursor:pointer;list-style:none}
 details.more>summary::-webkit-details-marker{display:none}
@@ -348,6 +355,8 @@ ${['e5', 'e10', 'diesel'].map((f, i) => `<button type="button" class="card" data
 </div>
 </details>
 
+<p class="howto"><a class="btn" href="${SITE}${t.howPath}">${t.howBtn}</a></p>
+
 <footer>
 <details><summary>${t.howTitle}</summary>${t.how.map((p) => `<p>${p}</p>`).join('')}</details>
 <p>${t.attribution}</p>
@@ -365,4 +374,7 @@ ${['e5', 'e10', 'diesel'].map((f, i) => `<button type="button" class="card" data
 mkdirSync('docs/de', { recursive: true });
 writeFileSync('docs/index.html', page('en'));
 writeFileSync('docs/de/index.html', page('de'));
-console.log('Built docs/index.html and docs/de/index.html');
+// Article: rendered from the approved Markdown on every build (text unchanged; see article.mjs).
+writeFileSync('docs/how-it-works.html', renderArticlePage(readFileSync('content/how-it-works.md', 'utf8'), 'en'));
+writeFileSync('docs/de/how-it-works.html', renderArticlePage(readFileSync('content/how-it-works.de.md', 'utf8'), 'de'));
+console.log('Built docs/index.html, docs/de/index.html, docs/how-it-works.html and docs/de/how-it-works.html');
