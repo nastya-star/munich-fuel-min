@@ -97,6 +97,46 @@ export function filterList(stations, fuel, { status = 'open', query = '' } = {})
   );
 }
 
+// ---- map marker colours -----------------------------------------------------------------------
+
+// Green is reserved for the confirmed minimum; every higher price is on a separate
+// yellow → orange → red scale (never green); stations without a valid price are grey.
+export const MARKER_COLORS = Object.freeze({ min: '#22C55E', yellow: '#FACC15', orange: '#F97316', red: '#EF4444', none: '#8C8981' });
+
+const hex = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+const mix = (a, b, t) => '#' + hex(a).map((v, i) => Math.round(v + (hex(b)[i] - v) * t).toString(16).padStart(2, '0')).join('').toUpperCase();
+
+/** t = 0 → yellow, 0.5 → orange, 1 → red (linear in RGB between the stops; hue never reaches green). */
+export function aboveColor(t) {
+  const x = Math.min(1, Math.max(0, t));
+  return x <= 0.5 ? mix(MARKER_COLORS.yellow, MARKER_COLORS.orange, x * 2) : mix(MARKER_COLORS.orange, MARKER_COLORS.red, (x - 0.5) * 2);
+}
+
+/**
+ * Colour for every station for the selected fuel, based on the ordered DISTINCT prices present.
+ *  - complete coverage: the minimum (all ties) is green; the remaining distinct prices go from
+ *    yellow (lowest above the minimum) to red (highest); a single higher price is red.
+ *  - incomplete coverage: nothing is green (the true minimum is unknown); all distinct prices go
+ *    from yellow (lowest) to red (highest); a single price is yellow.
+ * Equal prices always get identical colours. Returns {byId: Map(id → {tier, color, t}), min, max, distinct}.
+ */
+export function priceColors(stations, fuel, { complete }) {
+  const byId = new Map();
+  const distinct = [...new Set(stations.map((s) => validPrice(s, fuel)).filter((p) => p !== null))].sort((a, b) => a - b);
+  const scale = complete ? distinct.slice(1) : distinct;
+  const colorOf = new Map();
+  if (complete && distinct.length) colorOf.set(distinct[0], { tier: 'min', color: MARKER_COLORS.min, t: null });
+  scale.forEach((p, i) => {
+    const t = scale.length === 1 ? (complete ? 1 : 0) : i / (scale.length - 1);
+    colorOf.set(p, { tier: 'above', color: aboveColor(t), t });
+  });
+  for (const s of stations) {
+    const p = validPrice(s, fuel);
+    byId.set(s.id, p === null ? { tier: 'none', color: MARKER_COLORS.none, t: null } : colorOf.get(p));
+  }
+  return { byId, min: distinct[0] ?? null, max: distinct.at(-1) ?? null, distinct, complete };
+}
+
 // ---- formatting -------------------------------------------------------------------------------
 
 /** 1789 -> "1.789" (en) / "1,789" (de). Integer arithmetic only. */

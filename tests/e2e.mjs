@@ -15,7 +15,10 @@ if (!CHROME) { console.log('SKIP: Chrome not found (set CHROME_PATH)'); process.
 
 // ---- static server for docs/ ----------------------------------------------------------------------
 const DOCS = new URL('../docs/', import.meta.url);
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
+// 1×1 transparent PNG served for every map tile, so the test never touches the real tile server.
+const TILE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+let tileCalls = 0;
 const server = createServer((req, res) => {
   let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (p.endsWith('/')) p += 'index.html';
@@ -74,6 +77,10 @@ async function onEvent(d) {
   const url = new URL(d.params.request.url);
   let status = 200; let body = '[]';
   if (url.hostname.endsWith('workers.dev')) { const [s, b] = mockApi(url); status = s; body = JSON.stringify(b); }
+  else if (url.hostname === 'tile.openstreetmap.org') {
+    tileCalls++;
+    return send('Fetch.fulfillRequest', { requestId: d.params.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'image/png' }], body: TILE.toString('base64') }, d.sessionId);
+  }
   else if (url.hostname === 'nominatim.openstreetmap.org') { geoCalls++; body = JSON.stringify(url.searchParams.get('q').toLowerCase().includes('görres') ? GEO : []); }
   await send('Fetch.fulfillRequest', { requestId: d.params.requestId, responseCode: status, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }, { name: 'Access-Control-Allow-Origin', value: '*' }], body: Buffer.from(body).toString('base64') }, d.sessionId);
 }
@@ -85,7 +92,7 @@ try {
   const { targetId } = await send('Target.createTarget', { url: 'about:blank' }, undefined);
   session = (await send('Target.attachToTarget', { targetId, flatten: true }, undefined)).sessionId;
   await send('Page.enable');
-  await send('Fetch.enable', { patterns: [{ urlPattern: '*workers.dev*' }, { urlPattern: '*nominatim.openstreetmap.org*' }] });
+  await send('Fetch.enable', { patterns: [{ urlPattern: '*workers.dev*' }, { urlPattern: '*nominatim.openstreetmap.org*' }, ...(process.env.REAL_TILES ? [] : [{ urlPattern: '*tile.openstreetmap.org*' }])] });
 
   // 1. Default location -------------------------------------------------------------------------------
   await go(`${SITE}/`);
@@ -111,7 +118,93 @@ try {
   assert.equal(await ev(`document.querySelector('.card[data-fuel=e5]').getAttribute('aria-pressed')`), 'true');
   ok(`cards show E5/E10/Diesel minima of open stations (${cards.join(', ')}); ${tieCount} tied best stations; no "null" text`);
 
+  await sleep(process.env.REAL_TILES ? 2500 : 0);
   await shot('desktop-en');
+  // Theme and return link ---------------------------------------------------------------------------------
+  const theme = await ev(`({bg:getComputedStyle(document.body).backgroundColor,fg:getComputedStyle(document.body).color,h1:getComputedStyle(document.querySelector('h1')).fontFamily,body:getComputedStyle(document.body).fontFamily,
+    mq:[...document.styleSheets].some(ss=>{try{return [...ss.cssRules].some(r=>r.media&&/prefers-color-scheme/.test(r.media.mediaText))}catch(e){return false}}),back:document.querySelector('a.back').href,backText:document.querySelector('a.back').textContent})`);
+  assert.equal(theme.bg, 'rgb(17, 17, 17)');
+  assert.equal(theme.fg, 'rgb(245, 243, 238)');
+  assert.match(theme.h1, /^Georgia/);
+  assert.match(theme.body, /^system-ui/);
+  assert.equal(theme.mq, false, 'no automatic light/dark switching');
+  assert.equal(theme.back, 'https://nastya-star.github.io/anastasiia-stepanenko/');
+  assert.equal(theme.backText, '← Back to my website');
+  ok('dark identity (#111111, #F5F3EE, Georgia headings, system UI body), no colour-scheme switching; EN return link');
+
+  // Map: markers, colours, no extra requests ----------------------------------------------------------------
+  await waitFor(`document.querySelectorAll('.leaflet-marker-icon[data-id]').length>0`, 'map markers');
+  const visibleIds = STATIONS.filter((s) => s.isOpen && haversineKm({ lat: 48.1374, lng: 11.5755 }, s) <= 17).map((s) => s.id).sort();
+  const markers = async () => ev(`[...document.querySelectorAll('.leaflet-marker-icon[data-id]')].map(m=>({id:m.dataset.id,tier:m.dataset.tier,color:m.dataset.color}))`);
+  let mk = await markers();
+  assert.deepEqual(mk.map((m) => m.id).sort(), visibleIds, 'one marker per open station in the radius (open-only on)');
+  const checkColours = (list, fuel, complete) => {
+    const price = (id) => STATIONS.find((s) => s.id === id).prices[fuel];
+    const valid = list.filter((m) => price(m.id) != null);
+    const min = Math.min(...valid.map((m) => price(m.id)));
+    for (const m of list) {
+      const p = price(m.id);
+      if (p == null) assert.equal(m.tier, 'none', 'no price -> neutral');
+      else if (complete && p === min) assert.deepEqual([m.tier, m.color], ['min', '#22C55E'], 'every minimum tie is green');
+      else {
+        assert.equal(m.tier, 'above');
+        assert.notEqual(m.color, '#22C55E', 'higher prices are never green');
+        const [r, g, b] = [1, 3, 5].map((i) => parseInt(m.color.slice(i, i + 2), 16));
+        assert.ok(r >= 0xef && g <= 0xcc && b <= 0x44, `yellow→red only, got ${m.color}`);
+      }
+    }
+    const byPrice = new Map();
+    for (const m of valid) { const p = price(m.id); if (byPrice.has(p)) assert.equal(byPrice.get(p), m.color, 'equal prices, equal colours'); else byPrice.set(p, m.color); }
+    return { greens: list.filter((m) => m.tier === 'min').length, min };
+  };
+  const e5 = checkColours(mk, 'e5', true);
+  assert.equal(e5.greens, STATIONS.filter((s) => visibleIds.includes(s.id) && s.prices.e5 === e5.min).length);
+  assert.ok(e5.greens > 1, 'mock data has an E5 tie');
+  assert.ok(await ev(`!!document.querySelector('.leaflet-marker-icon[data-tier=min] .mk.min') && /✓/.test(document.querySelector('.leaflet-marker-icon[data-tier=min]').textContent)`), 'minimum markers carry a check mark');
+  assert.match(await text('#legend'), /Cheapest 1\.900 €\/L.*Higher/);
+  const view = () => ev(`document.querySelector('.leaflet-map-pane').style.transform + '|' + [...document.querySelectorAll('.leaflet-tile')].map(t=>t.src.split('/').slice(-3).join('/')).sort().join(',')`);
+  const view0 = await view();
+  const api0 = apiCalls.length;
+  for (const f of ['e10', 'diesel', 'e5']) {
+    await click(`.card[data-fuel=${f}]`);
+    await sleep(150);
+    const res = checkColours(await markers(), f, true);
+    assert.ok(res.greens >= 1);
+  }
+  assert.equal(await view(), view0, 'switching fuel keeps zoom and position');
+  assert.equal(apiCalls.length, api0, 'switching fuel makes no API request');
+  assert.ok(process.env.REAL_TILES || tileCalls > 0, 'tiles requested from the configured provider (intercepted)');
+  await click('.leaflet-control-zoom-in');
+  await sleep(400);
+  await ev(`document.querySelector('.leaflet-map-pane').dispatchEvent(new Event('mousedown'))`);
+  assert.equal(apiCalls.length, api0, 'zooming the map makes no API request');
+  ok(`map: ${mk.length} markers for open stations; green only for ${e5.greens} tied minimum stations; higher prices yellow→red, equal prices equal colours; fuel tabs restyle without moving the map or requesting data`);
+
+  // Marker click -> details; list -> map
+  const target = mk.find((m) => m.tier === 'above');
+  await ev(`document.querySelector('.leaflet-marker-icon[data-id="${target.id}"]').click()`);
+  await waitFor(`!!document.querySelector('.leaflet-popup .pop')`, 'popup');
+  const st0 = STATIONS.find((s) => s.id === target.id);
+  const pop = await text('.leaflet-popup .pop');
+  assert.match(pop, new RegExp((st0.prices.e5 / 1000).toFixed(3).replace('.', '\\.') + ' €/L · Super E5'));
+  assert.match(pop, /straight line/);
+  assert.match(pop, /Price retrieved/);
+  assert.equal(await text('#best-h'), 'Selected station');
+  const selHref = new URL(await ev(`document.querySelector('#best .stns a').href`));
+  assert.equal(selHref.searchParams.get('destination'), `${Number(st0.lat.toFixed(6))},${Number(st0.lng.toFixed(6))}`);
+  assert.equal(selHref.searchParams.get('origin'), '48.1374,11.5755');
+  await click('#show-cheapest');
+  assert.equal(await text('#best-h'), 'Best station');
+  await ev(`document.getElementById('more').open=true`);
+  const firstRow = await ev(`document.querySelector('#list .row').dataset.id`);
+  await click('#list .row [data-show]');
+  await waitFor(`!!document.querySelector('.leaflet-popup .pop')`, 'popup from list');
+  assert.equal(await ev(`document.querySelector('.leaflet-marker-icon .mk.sel').closest('.leaflet-marker-icon').dataset.id`), firstRow);
+  assert.equal(apiCalls.length, api0, 'selecting stations makes no API request');
+  ok('marker click shows popup + detail card (price, fuel, distance, retrieval time, route to that station); list "Show on map" highlights the marker');
+  await click('#show-cheapest');
+  await ev(`document.getElementById('more').open=false`);
+
   // 5. Directions from the selected origin --------------------------------------------------------------
   const href = await ev(`document.querySelector('#best a').href`);
   const u = new URL(href);
@@ -209,7 +302,10 @@ try {
   assert.match(await text('#status'), /Data may be outdated .*Refresh available in \d+ s/);
   assert.equal(await ev(`document.getElementById('refresh').disabled`), true);
   assert.match(await text('.card[data-fuel=e5] .h'), /incomplete/);
-  ok('partial coverage labelled "Incomplete", outdated, refresh countdown; refresh disabled');
+  const partialMarkers = await ev(`[...document.querySelectorAll('.leaflet-marker-icon[data-id]')].map(m=>m.dataset.tier)`);
+  assert.ok(partialMarkers.length > 0 && !partialMarkers.includes('min'), 'no green markers with incomplete coverage');
+  assert.match(await text('#legend'), /incomplete data, no confirmed cheapest/);
+  ok('partial coverage labelled "Incomplete", outdated, refresh countdown; refresh disabled; no green markers');
 
   mode = 'ratelimit';
   await click('input[name=radius][value="17"]'); // larger radius → needs a new request
@@ -231,7 +327,10 @@ try {
   assert.equal(new URL(await ev(`document.querySelector('#best a').href`)).searchParams.get('origin'), '48.200123,11.601235');
   assert.equal(await ev(`/\\bnull\\b|undefined|NaN/.test(document.body.innerText)`), false);
   await shot('desktop-de');
-  ok('DE page: location, radius and preference kept; German labels; decimal comma');
+  assert.equal(await ev(`document.querySelector('a.back').href`), 'https://nastya-star.github.io/anastasiia-stepanenko/de/');
+  assert.equal(await text('a.back'), '← Zurück zur Hauptwebsite');
+  assert.match(await text('#legend'), /Günstigster 1,900 €\/L/);
+  ok('DE page: location, radius and preference kept; German labels, legend and return link; decimal comma');
   await click('.lang a[data-lang=en]');
   await sleep(400);
   await waitFor(`document.documentElement.lang==='en'`, 'English page');
@@ -247,6 +346,7 @@ try {
   // Checkboxes/radios are measured by their clickable <label>.
   const small = await ev(`[...document.querySelectorAll('button,a.btn,input,select,.lang a')].filter(e=>e.offsetParent).map(e=>{const t=(e.type==='checkbox'||e.type==='radio')?e.closest('label'):e;return [e.id||e.className||e.tagName,Math.round(t.getBoundingClientRect().height)]}).filter(([,h])=>h<40)`);
   assert.deepEqual(small, [], 'touch targets at least 40px high');
+  await sleep(process.env.REAL_TILES ? 2500 : 0);
   await shot('mobile-en');
   ok('mobile 360 px: no horizontal overflow, touch targets ≥ 40 px');
 

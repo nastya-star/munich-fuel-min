@@ -175,3 +175,90 @@ test('list: filter by fuel, status and search; sort by price or distance', () =>
   assert.deepEqual(byPrice(eligible(S, 'e5'), 'e5').map((s) => s.id), ['b', 'd', 'a', 'e']);
   assert.deepEqual(byDistance(eligible(S, 'e5'), 'e5').map((s) => s.id), ['b', 'a', 'd', 'e']);
 });
+
+// ---- map marker colours ------------------------------------------------------------------------
+import { priceColors, aboveColor, MARKER_COLORS } from '../docs/core.js';
+
+const P = (id, e5) => st(id, { e5 });
+const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+/** Hue in degrees (0 = red, 60 = yellow, 120 = green). */
+function hue(h) {
+  const [r, g, b] = rgb(h).map((v) => v / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  if (!d) return 0;
+  const x = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return (x * 60 + 360) % 360;
+}
+
+test('colours: all stations tied at the minimum are green; nothing above it is green', () => {
+  const c = priceColors([P('a', 1899), P('b', 1899), P('c', 1909), P('d', 1959), P('e', 2009)], 'e5', { complete: true });
+  assert.equal(c.byId.get('a').color, MARKER_COLORS.min);
+  assert.equal(c.byId.get('b').color, MARKER_COLORS.min);
+  assert.deepEqual(['a', 'b'].map((id) => c.byId.get(id).tier), ['min', 'min']);
+  for (const id of ['c', 'd', 'e']) {
+    assert.equal(c.byId.get(id).tier, 'above');
+    assert.notEqual(c.byId.get(id).color, MARKER_COLORS.min);
+    assert.ok(hue(c.byId.get(id).color) <= 55, `${id} must be yellow→red, got hue ${hue(c.byId.get(id).color)}`);
+  }
+  assert.equal(c.byId.get('c').color, MARKER_COLORS.yellow, 'lowest price above the minimum is yellow');
+  assert.equal(c.byId.get('e').color, MARKER_COLORS.red, 'highest price is red');
+  assert.equal(c.byId.get('d').color, MARKER_COLORS.orange, 'middle of three distinct higher prices is orange');
+});
+
+test('colours: equal prices always get identical colours; scale uses ranks of distinct prices', () => {
+  const c = priceColors([P('a', 1800), P('b', 1850), P('c', 1850), P('d', 1990), P('e', 2400)], 'e5', { complete: true });
+  assert.equal(c.byId.get('b').color, c.byId.get('c').color);
+  assert.deepEqual(c.distinct, [1800, 1850, 1990, 2400]);
+  // ranks, not euro distances: 1990 sits exactly in the middle of the three higher values
+  assert.equal(c.byId.get('d').color, MARKER_COLORS.orange);
+});
+
+test('colours: uniform prices -> everything green', () => {
+  const c = priceColors([P('a', 1900), P('b', 1900), P('c', 1900)], 'e5', { complete: true });
+  assert.ok([...c.byId.values()].every((x) => x.color === MARKER_COLORS.min));
+});
+
+test('colours: exactly one higher price group -> red', () => {
+  const c = priceColors([P('a', 1900), P('b', 1950), P('c', 1950)], 'e5', { complete: true });
+  assert.equal(c.byId.get('a').color, MARKER_COLORS.min);
+  assert.equal(c.byId.get('b').color, MARKER_COLORS.red);
+  assert.equal(c.byId.get('c').color, MARKER_COLORS.red);
+});
+
+test('colours: missing / invalid prices are neutral grey and never on the scale', () => {
+  const c = priceColors([P('a', 1900), P('b', null), st('c', { e5: 0 }), st('d', { e5: 1.9 }), P('e', 1990)], 'e5', { complete: true });
+  for (const id of ['b', 'c', 'd']) assert.deepEqual(c.byId.get(id), { tier: 'none', color: MARKER_COLORS.none, t: null });
+  assert.deepEqual(c.distinct, [1900, 1990]);
+  assert.equal(c.byId.get('e').color, MARKER_COLORS.red);
+});
+
+test('colours: no valid prices at all -> all grey, no minimum', () => {
+  const c = priceColors([P('a', null), P('b', null)], 'e5', { complete: true });
+  assert.equal(c.min, null);
+  assert.ok([...c.byId.values()].every((x) => x.tier === 'none'));
+});
+
+test('colours: incomplete coverage -> no green at all; lowest yellow, highest red', () => {
+  const c = priceColors([P('a', 1899), P('b', 1899), P('c', 1950), P('d', 2010)], 'e5', { complete: false });
+  assert.ok(![...c.byId.values()].some((x) => x.tier === 'min' || x.color === MARKER_COLORS.min));
+  assert.equal(c.byId.get('a').color, MARKER_COLORS.yellow);
+  assert.equal(c.byId.get('d').color, MARKER_COLORS.red);
+  const single = priceColors([P('a', 1899), P('b', 1899)], 'e5', { complete: false });
+  assert.ok([...single.byId.values()].every((x) => x.color === MARKER_COLORS.yellow), 'one price, incomplete -> yellow, not green');
+});
+
+test('colours: the yellow→red scale never produces green, for any t', () => {
+  for (let i = 0; i <= 100; i++) {
+    const h = hue(aboveColor(i / 100));
+    assert.ok(h <= 52, `t=${i / 100} hue ${h}`);
+  }
+  assert.equal(aboveColor(0), MARKER_COLORS.yellow);
+  assert.equal(aboveColor(1), MARKER_COLORS.red);
+});
+
+test('colours: per fuel - the same stations colour differently for E10 and Diesel', () => {
+  const s = [st('a', { e5: 1900, e10: 1850, diesel: 2050 }), st('b', { e5: 1950, e10: 1800, diesel: null })];
+  assert.equal(priceColors(s, 'e5', { complete: true }).byId.get('a').tier, 'min');
+  assert.equal(priceColors(s, 'e10', { complete: true }).byId.get('b').tier, 'min');
+  assert.equal(priceColors(s, 'diesel', { complete: true }).byId.get('b').tier, 'none');
+});

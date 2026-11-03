@@ -41,6 +41,36 @@ docs/app.js, core.js                     └─ PriceGate Durable Object (one, g
   - It validates `lat`/`lng` (Germany only) and `rad` (1–25 km, the API maximum).
 - **Data handling.** No price data is committed and there is no bulk download. Prices are compared as integer thousandths of a euro and shown with three decimals. Missing, `false`, `0` or implausible prices are excluded. Station titles use the brand rather than legal company names.
 
+### Map
+
+One [Leaflet](https://leafletjs.com/) 1.9.4 map (self-hosted in `docs/vendor/leaflet/`, BSD-2-Clause) shows the stations of the current search: the radius, filtered by *Open stations only*. Clicking a fuel card restyles the markers in place, so zoom and position are kept. Panning, zooming, clicking markers and switching fuel never request prices. Clicking a marker opens a popup and the detail card, showing name, fuel, price (€/L, 3 decimals), address, straight-line distance, open/closed status, retrieval time and *Route planen*. *Show on map* in the list selects and centres that station.
+
+**Marker colours** (`priceColors()` in `docs/core.js`, unit-tested):
+
+| Colour | Meaning |
+| --- | --- |
+| Green with ✓ and a white ring | The minimum price for the selected fuel among the shown stations; every tied station. Only when the data covers the whole area. |
+| Yellow → orange → red | Every higher price, ranked by the distinct prices present: the next price above the minimum is yellow, the highest is red, and a single higher price is red. Equal prices get equal colours. The scale never turns green. |
+| Grey (small) | No valid price for that fuel. |
+
+If coverage is incomplete, nothing is green: all prices go from yellow to red, and the legend says there is no confirmed cheapest. There is no marker clustering: around 200–400 stations in a 25 km radius stay readable, and clusters would hide the price colours.
+
+**Tiles:** OpenStreetMap standard tiles (`https://tile.openstreetmap.org`) under the [OSMF tile usage policy](https://operations.osmfoundation.org/policies/tiles/):
+- HTTPS, with the browser’s Referer;
+- visible “© OpenStreetMap contributors” credit;
+- only tiles in view, with no prefetching.
+
+They are darkened with a CSS filter on the tile layer only; the attribution is not filtered. This suits a small personal site. The OSMF can restrict heavy users and gives no service guarantee. For more traffic, change `TILES` in `docs/app.js` to a dark provider such as [CARTO Dark Matter](https://github.com/CartoDB/basemap-styles), which needs a free key from carto.com (a public, domain-restricted key, not a secret), and drop `className: "tiles-dark"`.
+
+### Design
+
+The design uses the same tokens as the business-card site (`anastasiia-stepanenko/build.mjs`):
+- background `#111111`, text `#F5F3EE`, muted text `#B9B5AC`;
+- `Georgia, "Times New Roman", Times, serif` for headings, the system UI stack for body text;
+- 1px outlined buttons with 6px corners, and inverted (light) fill for selected and primary actions.
+
+There is no light mode. Amber and red appear only for warnings and errors; green, yellow, orange and red otherwise only on the map and its legend.
+
 ### API
 
 `GET /api/prices?lat=48.14&lng=11.58&rad=17.5`. Without parameters, the default area is used (Marienplatz, 17 km).
@@ -86,7 +116,7 @@ The terms also ask public sites not to filter results unless the user explicitly
 | `worker/` | Cloudflare Worker + Durable Object (`src/index.js`, `src/gate.js`, `src/normalize.js`, `wrangler.toml`) |
 | `tests/*.test.mjs` | Unit tests: minimum, ties, unavailable fuels, closed stations, price validation, cache, 1/min limit, concurrency (`node --test "tests/*.test.mjs"`) |
 | `tests/integration.mjs` | Runs the real Worker in workerd against a mock list.php: 40 concurrent requests → 1 upstream call, cache, origin inside the cached area, uncovered origin → 429, invalid areas → 400, stale labelling, key redaction, Origin check (`node tests/integration.mjs`, about 2.5 min) |
-| `tests/e2e.mjs` | Browser test in headless Chrome with mocked API and geocoder: default location, address search, geolocation allowed/denied, origin-aware directions, radius and coverage, partial/rate-limit states, list sorting/filtering/show more, EN/DE switch, mobile overflow and touch targets (`node tests/e2e.mjs`) |
+| `tests/e2e.mjs` | Browser test in headless Chrome with mocked API, geocoder and map tiles (`REAL_TILES=1` to load real tiles, `SHOT_DIR` for screenshots): theme and return links, map markers and colours per fuel, no requests on map/fuel interaction, marker/list selection, default location, address search, geolocation allowed/denied, origin-aware directions, radius and coverage, partial/rate-limit states, list sorting/filtering/show more, EN/DE switch, mobile overflow and touch targets (`node tests/e2e.mjs`) |
 | `tools/inspect.mjs` | Local, developer-only data inspector (not published): raw JSON, table, field list, search, filters and CSV export |
 
 ## Data and fuel types

@@ -5,7 +5,7 @@
 import {
   FUELS, RADII, DEFAULT_LOCATION, serverArea, responseCovers, localStations, minima, byPrice, byDistance, filterList,
   formatMilli, formatKm, formatTime, stationTitle, stationSubtitle, address, directionsUrl, parseGeocode, requestPosition,
-  loadSaved, save, validLocation,
+  loadSaved, save, validLocation, priceColors, validPrice,
 } from './core.js';
 
 // Public URL of the Cloudflare Worker (worker/). Contains no secret.
@@ -14,6 +14,10 @@ const API_BASE = 'https://munich-fuel-min.stepanenkon010.workers.dev';
 // no autocomplete, per https://operations.osmfoundation.org/policies/nominatim/).
 const GEOCODER = 'https://nominatim.openstreetmap.org/search';
 const LIST_PAGE = 20;
+// Map tiles: OpenStreetMap standard tiles (https://operations.osmfoundation.org/policies/tiles/),
+// darkened with CSS on the tile layer only. Only tiles in view are loaded (no prefetching).
+// To switch provider (e.g. CARTO Dark Matter with a free key), change this object; see README.
+const TILES = { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19, className: 'tiles-dark' };
 
 const lang = document.documentElement.lang === 'de' ? 'de' : 'en';
 const M = {
@@ -53,6 +57,17 @@ const M = {
     count: (n) => `${n} ${n === 1 ? 'station' : 'stations'}`,
     moreTitle: (n) => `Compare stations (${n})`,
     station: 'Petrol station',
+    selected: 'Selected station',
+    best: 'Best station',
+    showCheapest: '← Show the cheapest',
+    showOnMap: 'Show on map',
+    retrieved: (t) => `Price retrieved ${t}`,
+    noPriceFor: (f) => `No ${f} price reported`,
+    legendMin: (p) => `Cheapest ${p}`,
+    legendAbove: (a, b) => (a === b ? `Higher ${a}` : `Higher ${a} → ${b}`),
+    legendPartial: (a, b) => `${a} → ${b} · incomplete data, no confirmed cheapest`,
+    legendNone: 'no price',
+    mapUnavailable: 'The map could not be loaded. Prices and the list still work.',
     errors: {
       rate_limited: (s) => `Prices for this area can be requested again in ${s} s (one request per minute for all visitors).`,
       refresh_rate_limited: (s) => `New prices can be requested in ${s} s.`,
@@ -104,6 +119,17 @@ const M = {
     count: (n) => `${n} ${n === 1 ? 'Tankstelle' : 'Tankstellen'}`,
     moreTitle: (n) => `Tankstellen vergleichen (${n})`,
     station: 'Tankstelle',
+    selected: 'Ausgewählte Tankstelle',
+    best: 'Beste Tankstelle',
+    showCheapest: '← Günstigste anzeigen',
+    showOnMap: 'Auf der Karte',
+    retrieved: (t) => `Preis abgerufen ${t}`,
+    noPriceFor: (f) => `Kein Preis für ${f} gemeldet`,
+    legendMin: (p) => `Günstigster ${p}`,
+    legendAbove: (a, b) => (a === b ? `Teurer ${a}` : `Teurer ${a} → ${b}`),
+    legendPartial: (a, b) => `${a} → ${b} · unvollständige Daten, kein bestätigter Tiefstpreis`,
+    legendNone: 'kein Preis',
+    mapUnavailable: 'Die Karte konnte nicht geladen werden. Preise und Liste funktionieren weiterhin.',
     errors: {
       rate_limited: (s) => `Preise für dieses Gebiet können in ${s} s erneut abgefragt werden (eine Abfrage pro Minute für alle Besucher).`,
       refresh_rate_limited: (s) => `Neue Preise können in ${s} s abgefragt werden.`,
@@ -149,6 +175,7 @@ const els = {
   form: $('loc-form'), input: $('loc-input'), submit: $('loc-submit'), results: $('loc-results'), msg: $('loc-msg'), geo: $('geo'),
   radios: [...document.querySelectorAll('input[name=radius]')], openOnly: $('open-only'), status: $('status'), refresh: $('refresh'), note: $('note'),
   cards: [...document.querySelectorAll('.card[data-fuel]')], best: $('best'), more: $('more'), moreTitle: $('more-title'),
+  bestH: $('best-h'), mapEl: $('map'), legend: $('legend'),
   listQ: $('list-q'), listFuel: $('list-fuel'), listSort: $('list-sort'), listStatus: $('list-status'), listCount: $('list-count'), list: $('list'), showMore: $('show-more'),
 };
 
@@ -162,6 +189,7 @@ const state = {
   loading: false,
   listLimit: LIST_PAGE,
   nextAt: 0, // time (ms) when a new upstream request becomes possible
+  selectedId: null, // station chosen on the map or in the list
 };
 let inflight = null;
 let geocodeBusyUntil = 0;
@@ -356,7 +384,7 @@ els.refresh.addEventListener('click', () => load());
 
 function setFuel(f) {
   if (!FUELS.includes(f)) return;
-  state.fuel = f;
+  state.fuel = f; // map markers are restyled in place: zoom and position are kept
   els.listFuel.value = f;
   state.listLimit = LIST_PAGE;
   render();
@@ -369,6 +397,9 @@ function current() {
   if (!r) return { stations: [], partial: false };
   return { stations: localStations(r.stations, state.location, state.radius), partial: r.coverage !== 'full' || !responseCovers(r, state.location, state.radius) };
 }
+
+/** Stations shown on the map and coloured together: the radius plus the open-only filter. */
+const onMap = (stations) => (els.openOnly.checked ? stations.filter((s) => s.isOpen === true) : stations);
 
 function render() {
   renderStatus();
@@ -387,8 +418,13 @@ function render() {
     );
   });
   renderNote(partial && !!state.response);
-  renderBest(stations, mins[state.fuel], opts);
-  renderList();
+  const visible = onMap(stations);
+  const colors = priceColors(visible, state.fuel, { complete: !partial });
+  if (state.selectedId && !visible.some((s) => s.id === state.selectedId)) state.selectedId = null;
+  renderMap(visible, colors);
+  renderLegend(colors);
+  renderDetail(stations, visible, mins[state.fuel], opts);
+  renderList(colors);
 }
 
 function renderStatus() {
@@ -427,15 +463,42 @@ function updateCountdown() {
   if (cd) cd.textContent = M.refreshIn(Math.max(0, Math.ceil((state.nextAt - Date.now()) / 1000)));
 }
 
-function routeButton(s, cls = 'btn dark') {
+function routeButton(s, cls = 'btn solid') {
   const title = stationTitle(s, M.station);
   return el('a', { class: cls, href: directionsUrl(state.location, s), target: '_blank', rel: 'noopener', 'aria-label': M.routeLabel(title) }, M.route);
 }
 const statusBadge = (s) => el('span', { class: s.isOpen ? 'badge' : 'badge closed' }, s.isOpen ? M.open : M.closed);
+const priceText = (s) => (validPrice(s, state.fuel) === null ? M.noPriceFor(M.fuel[state.fuel]) : `${formatMilli(s.prices[state.fuel], lang)} ${M.perLitre}`);
 
-function renderBest(stations, min, opts) {
+/** Name, address, straight-line distance, status (and optionally retrieval time) of one station. */
+function stationLines(s, { time = false } = {}) {
+  return [
+    el('div', {}, el('p', { class: 'name' }, stationTitle(s, M.station)), stationSubtitle(s) ? el('p', { class: 'meta' }, stationSubtitle(s)) : null),
+    el('p', { class: 'meta' }, address(s)),
+    el('p', { class: 'meta' }, `${formatKm(s.dist, lang)} (${M.straight}) · `, statusBadge(s)),
+    time && state.response ? el('p', { class: 'meta' }, M.retrieved(formatTime(state.response.fetchedAt, lang))) : null,
+  ];
+}
+
+function renderDetail(stations, visible, min, opts) {
   const label = M.fuel[state.fuel];
+  const sel = state.selectedId ? visible.find((s) => s.id === state.selectedId) : null;
+  fill(els.bestH, sel ? M.selected : M.best);
   if (!state.response) return fill(els.best); // loading or error: the status line / notice explains why
+  if (sel) {
+    const p = validPrice(sel, state.fuel);
+    return fill(
+      els.best,
+      el(
+        'div',
+        { class: 'best' },
+        el('div', { class: 'price' }, p === null ? '–' : formatMilli(p, lang), el('small', {}, ` ${M.perLitre} · ${label}`)),
+        p === null ? el('p', { class: 'sel-note' }, M.noPriceFor(label)) : null,
+        el('ul', { class: 'stns' }, el('li', {}, stationLines(sel, { time: true }), routeButton(sel))),
+      ),
+      el('button', { type: 'button', class: 'linkbtn', id: 'show-cheapest' }, M.showCheapest),
+    );
+  }
   if (stations.length === 0) return fill(els.best, el('p', { class: 'empty' }, M.noStations));
   if (!min) return fill(els.best, el('p', { class: 'empty' }, opts.openOnly ? M.noneOpen(label) : M.none(label)));
   // The price is shown once; every station tied at that price is listed underneath.
@@ -446,25 +509,15 @@ function renderBest(stations, min, opts) {
       { class: 'best' },
       el('div', { class: 'price' }, formatMilli(min.priceMilli, lang), el('small', {}, ` ${M.perLitre} · ${label}`)),
       min.stations.length > 1 ? el('p', { class: 'tie' }, M.tie(min.stations.length)) : null,
-      el(
-        'ul',
-        { class: 'stns' },
-        min.stations.map((s) =>
-          el(
-            'li',
-            {},
-            el('div', {}, el('p', { class: 'name' }, stationTitle(s, M.station)), stationSubtitle(s) ? el('p', { class: 'meta' }, stationSubtitle(s)) : null),
-            el('p', { class: 'meta' }, address(s)),
-            el('p', { class: 'meta' }, `${formatKm(s.dist, lang)} (${M.straight}) · `, statusBadge(s)),
-            routeButton(s),
-          ),
-        ),
-      ),
+      el('ul', { class: 'stns' }, min.stations.map((s) => el('li', {}, stationLines(s, { time: true }), routeButton(s)))),
     ),
   );
 }
+els.best.addEventListener('click', (e) => {
+  if (e.target.id === 'show-cheapest') selectStation(null);
+});
 
-function renderList() {
+function renderList(colors) {
   const { stations } = current();
   const rows = filterList(stations, state.fuel, { status: els.listStatus.value, query: els.listQ.value });
   const sorted = els.listSort.value === 'dist' ? byDistance(rows, state.fuel) : byPrice(rows, state.fuel);
@@ -472,17 +525,143 @@ function renderList() {
   fill(els.listCount, M.count(sorted.length));
   fill(
     els.list,
-    sorted.slice(0, state.listLimit).map((s) =>
-      el(
+    sorted.slice(0, state.listLimit).map((s) => {
+      const c = colors?.byId.get(s.id); // undefined when the station is not on the map (e.g. closed while "open only")
+      return el(
         'li',
-        { class: 'row' },
-        el('span', { class: 'rp' }, formatMilli(s.prices[state.fuel], lang)),
+        { class: s.id === state.selectedId ? 'row on' : 'row', 'data-id': s.id },
+        el('span', { class: 'rp' }, c ? el('span', { class: 'dot', style: `--c:${c.color}`, 'aria-hidden': 'true' }) : null, formatMilli(s.prices[state.fuel], lang)),
         el('div', { class: 'who' }, el('b', {}, stationTitle(s, M.station)), el('p', { class: 'meta' }, address(s)), el('p', { class: 'meta' }, `${formatKm(s.dist, lang)} · `, statusBadge(s))),
-        routeButton(s, 'btn small'),
-      ),
-    ),
+        el('div', { class: 'acts' }, c && map ? el('button', { type: 'button', class: 'btn small', 'data-show': s.id }, M.showOnMap) : null, routeButton(s, 'btn small')),
+      );
+    }),
   );
   els.showMore.hidden = sorted.length <= state.listLimit;
+}
+els.list.addEventListener('click', (e) => {
+  const id = e.target.closest('[data-show]')?.getAttribute('data-show');
+  if (id) selectStation(id, { pan: true });
+});
+
+// ---- map --------------------------------------------------------------------------------------------
+// One Leaflet map. Fuel changes restyle the existing markers (view unchanged); the view is only
+// fitted when the starting point or radius changes. Nothing here requests prices.
+
+const map = (() => {
+  if (!window.L || !els.mapEl) {
+    if (els.mapEl) fill(els.mapEl, el('p', { class: 'empty' }, M.mapUnavailable));
+    return null;
+  }
+  const m = window.L.map(els.mapEl, { zoomControl: true, attributionControl: true, minZoom: 6, maxZoom: TILES.maxZoom });
+  window.L.tileLayer(TILES.url, { maxZoom: TILES.maxZoom, attribution: TILES.attribution, className: TILES.className }).addTo(m);
+  m.setView([state.location.lat, state.location.lng], 11);
+  return m;
+})();
+const mapState = { markers: new Map(), stations: new Map(), origin: null, circle: null, fitKey: '', idsKey: '' };
+
+function icon(c, selected) {
+  const size = c.tier === 'min' ? 24 : c.tier === 'none' ? 12 : 16;
+  return window.L.divIcon({
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2],
+    html: `<span class="mk ${c.tier}${selected ? ' sel' : ''}" style="--c:${c.color}">${c.tier === 'min' ? '✓' : ''}</span>`,
+  });
+}
+const zOf = (c) => (c.tier === 'min' ? 1000 : c.tier === 'none' ? -500 : Math.round((1 - c.t) * 400));
+
+function popupContent(id) {
+  const s = mapState.stations.get(id);
+  if (!s) return '';
+  const p = validPrice(s, state.fuel);
+  return el(
+    'div',
+    { class: 'pop' },
+    el('p', { class: 'name' }, stationTitle(s, M.station)),
+    el('p', { class: 'pp' }, p === null ? M.noPriceFor(M.fuel[state.fuel]) : [formatMilli(p, lang), el('small', {}, ` ${M.perLitre} · ${M.fuel[state.fuel]}`)]),
+    el('p', { class: 'meta' }, address(s)),
+    el('p', { class: 'meta' }, `${formatKm(s.dist, lang)} (${M.straight}) · `, statusBadge(s)),
+    state.response ? el('p', { class: 'meta' }, M.retrieved(formatTime(state.response.fetchedAt, lang))) : null,
+    routeButton(s, 'btn solid'),
+  );
+}
+
+function renderMap(visible, colors) {
+  if (!map) return;
+  const L = window.L;
+  const o = state.location;
+  // Starting point and search circle.
+  if (!mapState.origin) {
+    mapState.origin = L.marker([o.lat, o.lng], { icon: L.divIcon({ className: '', iconSize: [18, 18], iconAnchor: [9, 9], html: '<span class="mk origin"></span>' }), keyboard: false, interactive: false, zIndexOffset: 2000 }).addTo(map);
+    mapState.circle = L.circle([o.lat, o.lng], { radius: state.radius * 1000, color: '#F5F3EE', weight: 1, opacity: 0.6, fill: false, interactive: false }).addTo(map);
+  }
+  mapState.origin.setLatLng([o.lat, o.lng]);
+  mapState.circle.setLatLng([o.lat, o.lng]).setRadius(state.radius * 1000);
+  const fitKey = `${o.lat},${o.lng},${state.radius}`;
+  if (fitKey !== mapState.fitKey) {
+    mapState.fitKey = fitKey;
+    map.fitBounds(mapState.circle.getBounds(), { padding: [8, 8] });
+  }
+  // Markers: rebuilt only when the set of stations changes; otherwise restyled in place.
+  const idsKey = visible.map((s) => s.id).join(',');
+  if (idsKey !== mapState.idsKey) {
+    mapState.idsKey = idsKey;
+    for (const mk of mapState.markers.values()) mk.remove();
+    mapState.markers.clear();
+    mapState.stations.clear();
+    for (const s of visible) {
+      const mk = L.marker([s.lat, s.lng], { keyboard: false, riseOnHover: true });
+      mk.bindPopup(() => popupContent(s.id), { maxWidth: 260, autoPanPadding: [16, 16] });
+      mk.on('click', () => selectStation(s.id));
+      mk.addTo(map);
+      mapState.markers.set(s.id, mk);
+    }
+  }
+  for (const s of visible) mapState.stations.set(s.id, s); // current distances and prices
+  for (const [id, mk] of mapState.markers) {
+    const c = colors.byId.get(id);
+    const s = mapState.stations.get(id);
+    mk.setIcon(icon(c, id === state.selectedId));
+    mk.setZIndexOffset(zOf(c));
+    const node = mk.getElement();
+    if (node) {
+      node.setAttribute('title', `${stationTitle(s, M.station)}: ${priceText(s)}`);
+      node.setAttribute('data-id', id);
+      node.setAttribute('data-tier', c.tier);
+      node.setAttribute('data-color', c.color);
+    }
+    if (mk.isPopupOpen()) mk.setPopupContent(popupContent(id));
+  }
+}
+
+function renderLegend(colors) {
+  if (!state.response || !colors.distinct.length) return fill(els.legend);
+  const f = (p) => `${formatMilli(p, lang)} ${M.perLitre}`;
+  const dot = (cls, c, txt) => el('span', { class: 'mk ' + cls, style: `--c:${c}`, 'aria-hidden': 'true' }, txt || null);
+  const items = [];
+  if (colors.complete) {
+    items.push(el('span', { class: 'it' }, dot('min', '#22C55E', '✓'), M.legendMin(f(colors.min))));
+    if (colors.distinct.length > 1) items.push(el('span', { class: 'it' }, el('span', { class: 'grad', 'aria-hidden': 'true' }), M.legendAbove(f(colors.distinct[1]), f(colors.max))));
+  } else {
+    items.push(el('span', { class: 'it' }, el('span', { class: 'grad', 'aria-hidden': 'true' }), M.legendPartial(f(colors.min), f(colors.max))));
+  }
+  if ([...colors.byId.values()].some((c) => c.tier === 'none')) items.push(el('span', { class: 'it' }, dot('none', '#8C8981'), M.legendNone));
+  fill(els.legend, items);
+}
+
+function selectStation(id, { pan = false } = {}) {
+  state.selectedId = id;
+  render();
+  if (!map) return;
+  if (!id) return map.closePopup();
+  const mk = mapState.markers.get(id);
+  if (!mk) return;
+  if (pan) {
+    map.setView(mk.getLatLng(), Math.max(map.getZoom(), 14));
+    els.mapEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  if (!mk.isPopupOpen()) mk.openPopup();
 }
 
 // ---- start ----------------------------------------------------------------------------------------
