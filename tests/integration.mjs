@@ -108,6 +108,24 @@ try {
   for (const q of ['lat=99&lng=11&rad=5', 'lat=48.1&lng=11.5&rad=30', 'lat=abc&lng=11&rad=5']) assert.equal((await fetch(`${api}?${q}`)).status, 400, q);
   console.log('PASS invalid lat/lng/radius -> 400');
 
+  // 3e. Provenance and request coverage are part of real Worker responses.
+  assert.ok(inner.stations.every((s) => s.observedAt === inner.fetchedAt));
+  assert.equal(inner.observations.length, 1);
+  assert.deepEqual(inner.request, { radiusKm: 3, coveredRadiusKm: 3, complete: true });
+  const capped = await fetch(`${api}?lat=48.1374&lng=11.5755&rad=25`).then((r) => r.json());
+  assert.equal(capped.request.complete, false);
+  assert.ok(capped.request.coveredRadiusKm < 25);
+  assert.equal(upstreamCalls - base, 1);
+  console.log('PASS observedAt/observations present; 25 km off-grid request reports covered radius', capped.request.coveredRadiusKm, 'km');
+
+  // 3f. Edge rate limiter (RATE_LIMITER binding, 60/min per client). Local enforcement depends on
+  // the runtime, so this reports rather than asserts; no request may reach upstream either way.
+  const flood = await Promise.all(Array.from({ length: 80 }, () => fetch(api).then((r) => r.status)));
+  const limited = flood.filter((s) => s === 429).length;
+  assert.ok(flood.every((s) => s === 200 || s === 429));
+  assert.equal(upstreamCalls - base, 1, 'flood never reaches upstream');
+  console.log(`PASS flood of 80 requests -> ${limited} rejected by the edge limiter locally, 0 upstream calls`);
+
   // 4. After a minute, upstream fails -> stale cache labelled, key redacted.
   mode = 'fail';
   await sleep(61_000);
@@ -116,9 +134,11 @@ try {
   assert.equal(r4.status, 200);
   assert.equal(b4.stale, true);
   assert.equal(b4.error, 'upstream_key_rejected');
-  assert.ok(!r4.text.includes(TEST_KEY), 'key redacted from upstream message');
+  assert.ok(!r4.text.includes(TEST_KEY), 'key never in response');
+  assert.equal('upstreamMessage' in b4, false, 'no upstream diagnostic text');
+  assert.ok(!r4.text.includes('existiert'), 'upstream message suppressed');
   assert.equal(upstreamCalls - base, 2);
-  console.log('PASS failed refresh -> stale cache labelled (', b4.error, '), key redacted:', b4.upstreamMessage);
+  console.log('PASS failed refresh -> stale cache labelled (', b4.error, '), upstream message suppressed');
 
   // 5. Immediately again -> no upstream call (limit counts failed requests too).
   const b5 = JSON.parse((await get()).text);

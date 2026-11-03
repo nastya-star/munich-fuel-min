@@ -19,3 +19,14 @@ class_name = "PriceGate"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["PriceGate"]
+
+# Per-client edge rate limit (Workers rate limiting; approximate, counted per Cloudflare location).
+# Requests over the limit get 429 before reaching the Durable Object. Optional: handler.js works
+# without it. The strict per-client upstream budget lives in gate.js.
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 60
+  period = 60

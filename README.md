@@ -38,7 +38,7 @@ docs/app.js, core.js                     └─ PriceGate Durable Object (one, g
   - It is not in this repository, the Pages site, or any generated file.
   - It is never returned or logged, and upstream error messages are redacted.
   - The Worker only answers browsers on `https://nastya-star.github.io` (CORS plus an Origin check).
-  - It validates `lat`/`lng` (Germany only) and `rad` (1–25 km, the API maximum).
+  - It validates `lat`/`lng` (Germany only) and `rad` (1–25 km, the API maximum), and rejects any other parameters and overlong URLs.
 - **Data handling.** No price data is committed and there is no bulk download. Prices are compared as integer thousandths of a euro and shown with three decimals. Missing, `false`, `0` or implausible prices are excluded. Station titles use the brand rather than legal company names.
 
 ### Map
@@ -83,8 +83,20 @@ There is no light mode. Amber and red appear only for warnings and errors; green
 | `fetchedAt` | retrieval time |
 | `query` | the snapped area |
 | `nextRequestInSeconds` | seconds until a new upstream request is possible |
-| `stations` | normalised stations; `dist` from the query centre |
-| `error`, `retryAfterSeconds` | when fresh data was not possible |
+| `stations` | normalised stations; `dist` from the query centre, `observedAt` = when that station’s price was retrieved |
+| `observations` | provenance: one `{area, fetchedAt, stations}` per cached search that contributed (several for `partial` results) |
+| `request` | `{radiusKm, coveredRadiusKm, complete}`: how much of the requested circle the snapped area covers. Only near the 25 km cap is `complete` false: snapping can move the centre by up to ~0.75 km, and the API maximum leaves no room to compensate |
+| `error`, `retryAfterSeconds` | when fresh data was not possible: `refresh_rate_limited`/`rate_limited` (global 1/min), `client_rate_limited` (this client’s budget), `too_many_requests` (edge limiter), or `upstream_*` codes. Upstream diagnostic text is never forwarded |
+
+### Abuse controls
+
+The API is public. The `Origin` check and CORS only keep other *websites* from using it in visitors’ browsers. They are not authentication: any script can omit or forge `Origin`. Protection therefore does not rely on them:
+
+1. **Edge rate limit** (`RATE_LIMITER` binding in `wrangler.toml`, Workers rate limiting): 60 requests per minute per client, counted approximately and per Cloudflare location. Requests over it get 429 before reaching the Durable Object. It is optional: `handler.js` works without the binding (remove the `[[ratelimits]]` block if the account does not support it).
+2. **Strict per-client upstream budget** (in the global Durable Object, `gate.js`): a client may trigger at most 3 fresh Tankerkönig requests per 10 minutes. Requests answered from the cache are free. Beyond the budget, the client gets labelled cached/partial data or 429 `client_rate_limited`, so one client cannot keep the shared budget busy.
+3. **Global gate:** at most 1 upstream request per minute for everyone, unchanged.
+
+Clients are identified by a truncated SHA-256 of the connecting IP. It is held in memory only; neither IPs nor hashes are stored or logged. Remaining limits: many IPs (a botnet) can still use the global minute budget in turn, and responses can be scraped at the edge rate. A CAPTCHA-style check (e.g. Cloudflare Turnstile) would be the next step if that happens.
 
 ### Geocoding
 
@@ -113,7 +125,9 @@ The terms also ask public sites not to filter results unless the user explicitly
 | --- | --- |
 | `docs/` | GitHub Pages site (static): `index.html` (EN), `de/index.html` (DE), `app.js`, `core.js` |
 | `build.mjs` | Generates both HTML pages from one template: `node build.mjs` |
-| `worker/` | Cloudflare Worker + Durable Object (`src/index.js`, `src/gate.js`, `src/normalize.js`, `wrangler.toml`) |
+| `worker/` | Cloudflare Worker + Durable Object (`src/index.js`, `src/handler.js` HTTP + abuse controls, `src/gate.js`, `src/query.js`, `src/geo.js`, `src/normalize.js`, `wrangler.toml`) |
+| `tests/hardening.test.mjs` | Abuse controls, 25 km coverage edge case, provenance, suppressed upstream messages |
+| `.github/workflows/ci.yml` | CI: unit, integration, E2E |
 | `tests/*.test.mjs` | Unit tests: minimum, ties, unavailable fuels, closed stations, price validation, cache, 1/min limit, concurrency (`node --test "tests/*.test.mjs"`) |
 | `tests/integration.mjs` | Runs the real Worker in workerd against a mock list.php: 40 concurrent requests → 1 upstream call, cache, origin inside the cached area, uncovered origin → 429, invalid areas → 400, stale labelling, key redaction, Origin check (`node tests/integration.mjs`, about 2.5 min) |
 | `tests/e2e.mjs` | Browser test in headless Chrome with mocked API, geocoder and map tiles (`REAL_TILES=1` to load real tiles, `SHOT_DIR` for screenshots): theme and return links, map markers and colours per fuel, no requests on map/fuel interaction, marker/list selection, default location, address search, geolocation allowed/denied, origin-aware directions, radius and coverage, partial/rate-limit states, list sorting/filtering/show more, EN/DE switch, mobile overflow and touch targets (`node tests/e2e.mjs`) |
@@ -178,6 +192,13 @@ Then set `API_BASE` in `docs/app.js` to the printed URL (it contains no secret),
 Check that it works: `curl -s https://munich-fuel-min.<subdomain>.workers.dev/api/prices | head -c 300`. A response with `"ok":true` and stations means the key is active. `upstream_key_rejected` means the key is not activated yet: confirm the email from Tankerkönig.
 
 Free-plan usage is tiny: each click is one Worker request plus one Durable Object request, and at most one upstream request per minute.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to `main` and every pull request. It uses read-only permissions, no secrets and no Tankerkönig access:
+- unit tests, plus a check that `docs/` matches `build.mjs`;
+- the Worker integration test (workerd, mock list.php);
+- the browser E2E test (headless Chrome; API, geocoder and tiles mocked).
 
 ## Development
 

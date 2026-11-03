@@ -75,6 +75,8 @@ const M = {
     errors: {
       rate_limited: (s) => `Prices for this area can be requested again in ${s} s (one request per minute for all visitors).`,
       refresh_rate_limited: (s) => `New prices can be requested in ${s} s.`,
+      client_rate_limited: (s) => `You have requested several new areas in a short time. New prices for this area can be requested in ${s} s.`,
+      too_many_requests: (s) => `Too many requests from your connection. Please try again in ${s} s.`,
       not_configured: 'The price service is not set up. No prices are shown.',
       upstream_rate_limited: 'Tankerkönig is limiting requests right now. Please try again in a minute.',
       upstream_key_rejected: 'Tankerkönig rejected the request. No prices are shown.',
@@ -141,6 +143,8 @@ const M = {
     errors: {
       rate_limited: (s) => `Preise für dieses Gebiet können in ${s} s erneut abgefragt werden (eine Abfrage pro Minute für alle Besucher).`,
       refresh_rate_limited: (s) => `Neue Preise können in ${s} s abgefragt werden.`,
+      client_rate_limited: (s) => `Sie haben in kurzer Zeit mehrere neue Gebiete abgefragt. Neue Preise für dieses Gebiet sind in ${s} s möglich.`,
+      too_many_requests: (s) => `Zu viele Anfragen von Ihrer Verbindung. Bitte versuchen Sie es in ${s} s erneut.`,
       not_configured: 'Der Preisdienst ist nicht eingerichtet. Es werden keine Preise angezeigt.',
       upstream_rate_limited: 'Tankerkönig begrenzt gerade die Abfragen. Bitte versuchen Sie es in einer Minute erneut.',
       upstream_key_rejected: 'Tankerkönig hat die Abfrage abgelehnt. Es werden keine Preise angezeigt.',
@@ -458,7 +462,7 @@ function renderNote(partial) {
   const texts = [];
   if (partial) texts.push(M.partial);
   // When older data is shown, the status line already says when a refresh is possible.
-  if (state.error && !state.loading && !(state.response && state.error.code === 'refresh_rate_limited')) {
+  if (state.error && !state.loading && !(state.response && (state.error.code === 'refresh_rate_limited' || state.error.code === 'client_rate_limited'))) {
     const msg = M.errors[state.error.code] || M.errors.unknown;
     const wait = Math.max(1, Math.ceil((state.nextAt - Date.now()) / 1000));
     texts.push(typeof msg === 'function' ? msg(wait) : msg);
@@ -484,7 +488,7 @@ function stationLines(s, { time = false } = {}) {
     el('div', {}, el('p', { class: 'name' }, stationTitle(s, M.station)), stationSubtitle(s) ? el('p', { class: 'meta' }, stationSubtitle(s)) : null),
     el('p', { class: 'meta' }, address(s)),
     el('p', { class: 'meta' }, `${formatKm(s.dist, lang)} (${M.straight}) · `, statusBadge(s)),
-    time && state.response ? el('p', { class: 'meta' }, M.retrieved(formatTime(state.response.fetchedAt, lang))) : null,
+    time && state.response ? el('p', { class: 'meta' }, M.retrieved(formatTime(s.observedAt || state.response.fetchedAt, lang))) : null,
   ];
 }
 
@@ -602,7 +606,7 @@ function popupContent(id) {
     el('p', { class: 'pp' }, p === null ? M.noPriceFor(M.fuel[state.fuel]) : [formatMilli(p, lang), el('small', {}, ` ${M.perLitre} · ${M.fuel[state.fuel]}`)]),
     el('p', { class: 'meta' }, address(s)),
     el('p', { class: 'meta' }, `${formatKm(s.dist, lang)} (${M.straight}) · `, statusBadge(s)),
-    state.response ? el('p', { class: 'meta' }, M.retrieved(formatTime(state.response.fetchedAt, lang))) : null,
+    state.response ? el('p', { class: 'meta' }, M.retrieved(formatTime(s.observedAt || state.response.fetchedAt, lang))) : null,
     routeButton(s, 'btn solid'),
   );
 }
