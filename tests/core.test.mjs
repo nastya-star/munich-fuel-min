@@ -135,6 +135,9 @@ test('geocoder results become selectable places; bad entries are dropped', () =>
   ]);
   assert.deepEqual(places, [{ label: 'Görresstraße 29, Maßmannbergl, Maxvorstadt', lat: 48.1554264, lng: 11.5634866, source: 'search' }]);
   assert.deepEqual(parseGeocode(null), []);
+  // Real Nominatim order for an address: house number first.
+  assert.equal(parseGeocode([{ display_name: '29, Görresstraße, Maßmannbergl, Maxvorstadt, München', lat: '48.1554', lon: '11.5635' }])[0].label, 'Görresstraße 29, Maßmannbergl, Maxvorstadt');
+  assert.equal(parseGeocode([{ display_name: 'Edeka, 29, Görresstraße, München', lat: '48.1554', lon: '11.5635' }])[0].label, 'Edeka, 29, Görresstraße');
 });
 
 // 3. geolocation success / denial

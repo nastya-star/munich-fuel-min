@@ -182,6 +182,8 @@ export function parseGeocode(results) {
     const lng = Number(r?.lon);
     const parts = String(r?.display_name || '').split(',').map((p) => p.trim()).filter(Boolean);
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || !parts.length) continue;
+    // Nominatim lists the house number first ("29, Görresstraße, …"); show "Görresstraße 29, …".
+    if (parts.length > 1 && /^\d+\s?[a-z]?(-\d+)?$/i.test(parts[0])) parts.splice(0, 2, `${parts[1]} ${parts[0]}`);
     const label = parts.slice(0, 3).join(', ');
     if (!out.some((o) => o.label === label)) out.push({ label, lat, lng, source: 'search' });
   }
