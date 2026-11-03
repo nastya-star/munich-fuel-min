@@ -5,7 +5,7 @@
 import {
   FUELS, RADII, DEFAULT_LOCATION, serverArea, responseCovers, localStations, minima, byPrice, byDistance, filterList,
   formatMilli, formatKm, formatTime, stationTitle, stationSubtitle, address, directionsUrl, parseGeocode, requestPosition,
-  loadSaved, save, validLocation, priceColors, validPrice,
+  loadSaved, save, validLocation, priceColors, validPrice, priceGap, formatCents,
 } from './core.js';
 
 // Public URL of the Cloudflare Worker (worker/). Contains no secret.
@@ -47,7 +47,7 @@ const M = {
     straight: 'straight line',
     open: 'Open',
     closed: 'Closed',
-    route: 'Route planen',
+    route: 'Directions',
     routeLabel: (n) => `Directions to ${n} in Google Maps, by car from your starting point (opens in a new tab)`,
     tie: (n) => `${n} stations share the lowest price.`,
     noneOpen: (f) => `No open station in this radius reports a ${f} price. Try a larger radius or include closed stations.`,
@@ -59,7 +59,11 @@ const M = {
     station: 'Petrol station',
     selected: 'Selected station',
     best: 'Best station',
-    showCheapest: '← Show the cheapest',
+    showCheapest: 'Show cheapest station',
+    lowestPrice: 'Lowest price',
+    lowestObserved: 'Lowest observed price – data incomplete, not a confirmed minimum',
+    gapAbove: (c) => `${c} ct/L above the cheapest price`,
+    gapAboveObserved: (c) => `${c} ct/L above the lowest observed price (data incomplete)`,
     showOnMap: 'Show on map',
     retrieved: (t) => `Price retrieved ${t}`,
     noPriceFor: (f) => `No ${f} price reported`,
@@ -121,7 +125,11 @@ const M = {
     station: 'Tankstelle',
     selected: 'Ausgewählte Tankstelle',
     best: 'Beste Tankstelle',
-    showCheapest: '← Günstigste anzeigen',
+    showCheapest: 'Günstigste Tankstelle anzeigen',
+    lowestPrice: 'Günstigster Preis',
+    lowestObserved: 'Niedrigster beobachteter Preis – Daten unvollständig, kein bestätigter Tiefstpreis',
+    gapAbove: (c) => `${c} ct/L über dem günstigsten Preis`,
+    gapAboveObserved: (c) => `${c} ct/L über dem niedrigsten beobachteten Preis (Daten unvollständig)`,
     showOnMap: 'Auf der Karte',
     retrieved: (t) => `Preis abgerufen ${t}`,
     noPriceFor: (f) => `Kein Preis für ${f} gemeldet`,
@@ -423,7 +431,7 @@ function render() {
   if (state.selectedId && !visible.some((s) => s.id === state.selectedId)) state.selectedId = null;
   renderMap(visible, colors);
   renderLegend(colors);
-  renderDetail(stations, visible, mins[state.fuel], opts);
+  renderDetail(stations, visible, mins[state.fuel], opts, partial);
   renderList(colors);
 }
 
@@ -480,23 +488,30 @@ function stationLines(s, { time = false } = {}) {
   ];
 }
 
-function renderDetail(stations, visible, min, opts) {
+function renderDetail(stations, visible, min, opts, partial) {
   const label = M.fuel[state.fuel];
   const sel = state.selectedId ? visible.find((s) => s.id === state.selectedId) : null;
   fill(els.bestH, sel ? M.selected : M.best);
   if (!state.response) return fill(els.best); // loading or error: the status line / notice explains why
   if (sel) {
     const p = validPrice(sel, state.fuel);
+    // Difference to the cheapest eligible station, in integer thousandths of a euro → cents.
+    const gap = priceGap(p, min?.priceMilli);
+    const gapText =
+      gap.kind === 'min' ? (partial ? M.lowestObserved : M.lowestPrice)
+      : gap.kind === 'above' ? (partial ? M.gapAboveObserved : M.gapAbove)(formatCents(gap.milli, lang))
+      : null;
     return fill(
       els.best,
       el(
         'div',
-        { class: 'best' },
-        el('div', { class: 'price' }, p === null ? '–' : formatMilli(p, lang), el('small', {}, ` ${M.perLitre} · ${label}`)),
-        p === null ? el('p', { class: 'sel-note' }, M.noPriceFor(label)) : null,
-        el('ul', { class: 'stns' }, el('li', {}, stationLines(sel, { time: true }), routeButton(sel))),
+        { class: 'best sel' },
+        el('p', { class: 'fuel' }, label),
+        el('div', { class: 'price' }, p === null ? M.noPriceFor(label) : [formatMilli(p, lang), el('small', {}, ` ${M.perLitre}`)]),
+        gapText ? el('p', { class: gap.kind === 'min' && !partial ? 'gap lowest' : 'gap' }, gapText) : null,
+        el('ul', { class: 'stns' }, el('li', {}, stationLines(sel, { time: true }))),
+        el('div', { class: 'acts' }, routeButton(sel), el('button', { type: 'button', class: 'btn', id: 'show-cheapest' }, M.showCheapest)),
       ),
-      el('button', { type: 'button', class: 'linkbtn', id: 'show-cheapest' }, M.showCheapest),
     );
   }
   if (stations.length === 0) return fill(els.best, el('p', { class: 'empty' }, M.noStations));
@@ -514,7 +529,10 @@ function renderDetail(stations, visible, min, opts) {
   );
 }
 els.best.addEventListener('click', (e) => {
-  if (e.target.id === 'show-cheapest') selectStation(null);
+  if (e.target.closest('#show-cheapest')) {
+    selectStation(null);
+    els.bestH.focus();
+  }
 });
 
 function renderList(colors) {

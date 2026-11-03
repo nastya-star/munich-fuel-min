@@ -191,7 +191,26 @@ export function stationSubtitle(s) {
   const brand = prettify(s.brand);
   if (!name || !brand || isLegalName(name)) return '';
   if (name.toLocaleLowerCase('de') === brand.toLocaleLowerCase('de')) return '';
+  // Names that merely repeat the street ("Shell München Schwere-Reiter-Str. 26") would show the
+  // address twice; the address line already has it.
+  const key = (x) => x.toLocaleLowerCase('de').replace(/[^\p{L}]/gu, '');
+  const streetWord = (prettify(s.street).split(/[\s-]/)[0] || '').slice(0, 6);
+  if (streetWord.length >= 5 && key(name).includes(key(streetWord))) return '';
   return name;
+}
+
+/**
+ * Gap between a station's price and the minimum, both in thousandths of a euro.
+ * {kind:'min'} when tied, {kind:'above', milli} when higher, {kind:'none'} without a valid price.
+ */
+export function priceGap(priceMilli, minMilli) {
+  if (!Number.isInteger(priceMilli) || !Number.isInteger(minMilli) || priceMilli < minMilli) return { kind: 'none' };
+  return priceMilli === minMilli ? { kind: 'min' } : { kind: 'above', milli: priceMilli - minMilli };
+}
+
+/** Thousandths of a euro → cents: 40 → "4", 15 → "1.5" (en) / "1,5" (de). */
+export function formatCents(milli, lang) {
+  return (milli / 10).toLocaleString(lang === 'de' ? 'de-DE' : 'en-GB', { maximumFractionDigits: 1 });
 }
 
 export function address(s) {

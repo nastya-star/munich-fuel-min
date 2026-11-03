@@ -268,3 +268,29 @@ test('HTML-escaped station names from MTS-K are decoded for display', () => {
   assert.equal(stationSubtitle({ name: 'OIL! tank &amp; go Karlsfeld', brand: 'OIL!' }), 'OIL! tank & go Karlsfeld');
   assert.equal(prettify('&lt;b&gt;'), '<b>'); // shown via textContent, never parsed as HTML
 });
+
+// ---- selected-station price gap ------------------------------------------------------------------
+import { priceGap, formatCents } from '../docs/core.js';
+
+test('price gap uses thousandths of a euro: 1.969 vs 1.929 is 4 ct, not 40', () => {
+  assert.deepEqual(priceGap(1969, 1929), { kind: 'above', milli: 40 });
+  assert.equal(formatCents(40, 'en'), '4');
+  assert.equal(formatCents(40, 'de'), '4');
+  assert.equal(formatCents(15, 'en'), '1.5');
+  assert.equal(formatCents(15, 'de'), '1,5');
+  assert.equal(formatCents(1, 'de'), '0,1');
+  assert.equal(formatCents(600, 'en'), '60');
+});
+
+test('price gap: tie with the minimum, missing price, missing minimum', () => {
+  assert.deepEqual(priceGap(1929, 1929), { kind: 'min' });
+  assert.deepEqual(priceGap(null, 1929), { kind: 'none' });
+  assert.deepEqual(priceGap(1969, undefined), { kind: 'none' });
+  assert.deepEqual(priceGap(1900, 1929), { kind: 'none' }, 'never a negative gap');
+});
+
+test('station subtitle is dropped when it only repeats the street (address shown once)', () => {
+  assert.equal(stationSubtitle({ name: 'Shell Muenchen Schwere-Reiter- Str. 26', brand: 'Shell', street: 'Schwere-Reiter- Str.' }), '');
+  assert.equal(stationSubtitle({ name: 'MÜNCHEN - JOSEPHSPITALSTR. 12', brand: 'AGIP ENI', street: 'Josephspitalstrasse' }), '');
+  assert.equal(stationSubtitle({ name: 'BK Tankstelle Isarparkhaus', brand: 'BK', street: 'Baader Str.' }), 'BK Tankstelle Isarparkhaus');
+});

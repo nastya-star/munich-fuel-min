@@ -119,6 +119,14 @@ input::placeholder{color:#8f8b83}
 .badge{display:inline-block;padding:0 .5rem;border:1px solid var(--soft);border-radius:999px;font-size:.78rem;font-weight:600;color:var(--fg)}
 .badge.closed{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .tie,.sel-note{margin:.35rem 0 0;color:var(--mute);font-size:.9rem}
+.best .fuel{margin:0 0 .3rem;font-size:.8rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.best.sel .price{font-size:clamp(2rem,9vw,2.7rem)}
+.gap{margin:.45rem 0 0;font-size:.95rem;color:var(--fg)}
+.gap.lowest{display:inline-flex;align-items:center;gap:.4rem;padding:.1rem .6rem;border:1px solid var(--soft);border-radius:999px;font-weight:600}
+.gap.lowest::before{content:"✓";font-weight:700}
+.best .acts{display:grid;gap:.55rem;margin-top:.9rem}
+#best-h:focus{outline:none}
+#best-h:focus-visible{outline:2px solid var(--fg);outline-offset:4px}
 .empty{margin:0;padding:1rem;border:1px dashed var(--soft);border-radius:var(--r);color:var(--mute)}
 .linkbtn{background:none;border:0;padding:.3rem 0;color:var(--mute);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-size:.88rem;min-height:2.4rem}
 .linkbtn:hover{color:var(--fg)}
@@ -205,7 +213,7 @@ footer details summary{cursor:pointer;color:var(--fg);min-height:2.4rem;display:
 <div class="legend" id="legend" aria-label="Price colours"></div>
 </div>
 <section class="detail" aria-labelledby="best-h">
-<h2 id="best-h">Best station</h2>
+<h2 id="best-h" tabindex="-1">Best station</h2>
 <div id="best" aria-live="polite"></div>
 </section>
 </div>
@@ -226,7 +234,7 @@ footer details summary{cursor:pointer;color:var(--fg);min-height:2.4rem;display:
 </details>
 
 <footer>
-<details><summary>How it works</summary><p>Prices for Super E5, Super E10 and Diesel are retrieved from Tankerkönig when you open the page, choose a starting point or click Refresh. For all visitors together, at most one new request is made per minute; in between, recent results are reused and labelled with their retrieval time. Moving or zooming the map and switching fuel never request new data.</p><p>The cheapest price is the lowest price in €/L (to a tenth of a cent) among stations in the chosen radius that report a valid price and – unless you untick the filter – are reported as open. All stations with that price are shown and marked green with a check mark on the map. Every higher price is coloured from yellow (next cheapest) to red (most expensive) by its rank among the prices present; stations without a price for the fuel are grey. If the data for your area is incomplete, nothing is marked green.</p><p>Distances are straight-line distances from your starting point, not driving distances. Route planen opens Google Maps from your starting point to the station.</p><p>Your starting point is used in your browser only. The server receives it rounded to about 1 km and does not store your exact location.</p></details>
+<details><summary>How it works</summary><p>Prices for Super E5, Super E10 and Diesel are retrieved from Tankerkönig when you open the page, choose a starting point or click Refresh. For all visitors together, at most one new request is made per minute; in between, recent results are reused and labelled with their retrieval time. Moving or zooming the map and switching fuel never request new data.</p><p>The cheapest price is the lowest price in €/L (to a tenth of a cent) among stations in the chosen radius that report a valid price and – unless you untick the filter – are reported as open. All stations with that price are shown and marked green with a check mark on the map. Every higher price is coloured from yellow (next cheapest) to red (most expensive) by its rank among the prices present; stations without a price for the fuel are grey. If the data for your area is incomplete, nothing is marked green.</p><p>Distances are straight-line distances from your starting point, not driving distances. Directions opens Google Maps from your starting point to the station.</p><p>Your starting point is used in your browser only. The server receives it rounded to about 1 km and does not store your exact location.</p></details>
 <p>Price data: <a href="https://www.tankerkoenig.de/" rel="noopener">Tankerkönig</a> (<a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">CC BY 4.0</a>), based on reports to the Markttransparenzstelle für Kraftstoffe (MTS-K) of the Bundeskartellamt. Map and address search: © <a href="https://www.openstreetmap.org/copyright" rel="noopener">OpenStreetMap</a> contributors (tiles darkened for display), <a href="https://nominatim.openstreetmap.org/" rel="noopener">Nominatim</a>, <a href="https://leafletjs.com/" rel="noopener">Leaflet</a>.</p>
 <p>No guarantee that prices are current or correct; the price at the pump applies. Source code on <a href="https://github.com/nastya-star/munich-fuel-min" rel="noopener">GitHub</a>.</p>
 </footer>

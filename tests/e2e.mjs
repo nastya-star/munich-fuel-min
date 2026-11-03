@@ -193,11 +193,42 @@ try {
   assert.match(pop, /straight line/);
   assert.match(pop, /Price retrieved/);
   assert.equal(await text('#best-h'), 'Selected station');
-  const selHref = new URL(await ev(`document.querySelector('#best .stns a').href`));
+  // Selected-station panel: fuel, price, gap in ct/L (thousandths / 10), address once, buttons.
+  const minE5 = Math.min(...STATIONS.filter((s) => s.isOpen && haversineKm({ lat: 48.1374, lng: 11.5755 }, s) <= 17 && s.prices.e5).map((s) => s.prices.e5));
+  const panel = await ev(`({fuel:document.querySelector('#best .fuel').textContent,price:document.querySelector('#best .price').textContent,gap:document.querySelector('#best .gap').textContent,
+    addrCount:[...document.querySelectorAll('#best .meta')].filter(m=>m.textContent.includes('Teststraße')).length,
+    route:document.querySelector('#best .acts a.btn.solid').textContent,cheap:(()=>{const b=document.getElementById('show-cheapest');return {tag:b.tagName,cls:b.className,visible:!!b.offsetParent,h:Math.round(b.getBoundingClientRect().height),text:b.textContent}})(),
+    nullText:/\\bnull\\b|NaN|undefined/.test(document.getElementById('best').innerText)})`);
+  assert.equal(panel.fuel, 'Super E5');
+  assert.equal(panel.price, `${(st0.prices.e5 / 1000).toFixed(3)} €/L`);
+  const cents = (st0.prices.e5 - minE5) / 10;
+  assert.equal(panel.gap, `${cents.toLocaleString('en-GB', { maximumFractionDigits: 1 })} ct/L above the cheapest price`);
+  assert.ok(cents < 100, `gap is in cents (${cents}), not tenths of a cent`);
+  assert.equal(panel.addrCount, 1, 'address shown once');
+  assert.equal(panel.route, 'Directions');
+  assert.deepEqual([panel.cheap.tag, panel.cheap.cls, panel.cheap.visible, panel.cheap.h >= 40, panel.cheap.text], ['BUTTON', 'btn', true, true, 'Show cheapest station']);
+  assert.equal(panel.nullText, false);
+  await shot('selected-en');
+  const selHref = new URL(await ev(`document.querySelector('#best .acts a').href`));
   assert.equal(selHref.searchParams.get('destination'), `${Number(st0.lat.toFixed(6))},${Number(st0.lng.toFixed(6))}`);
   assert.equal(selHref.searchParams.get('origin'), '48.1374,11.5755');
+  // Keyboard: focus the button and press Enter -> selection cleared, cheapest shown, focus on heading.
+  await ev(`document.getElementById('show-cheapest').focus()`);
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+  await sleep(200);
+  assert.equal(await text('#best-h'), 'Best station');
+  assert.equal(await ev(`document.activeElement.id`), 'best-h');
+  assert.equal(await ev(`document.querySelectorAll('.leaflet-marker-icon .mk.sel').length`), 0, 'marker highlight cleared');
+  assert.match(await text('#best .price'), new RegExp((minE5 / 1000).toFixed(3).replace('.', '\\.')));
+  // A station tied at the minimum: "Lowest price" instead of a difference.
+  const tiedId = (await markers()).find((m) => m.tier === 'min').id;
+  await ev(`document.querySelector('.leaflet-marker-icon[data-id="${tiedId}"]').click()`);
+  await sleep(200);
+  assert.equal(await text('#best .gap'), 'Lowest price');
   await click('#show-cheapest');
   assert.equal(await text('#best-h'), 'Best station');
+  ok(`selected-station panel: fuel, price, "${panel.gap}", address once, Directions + Show cheapest (keyboard works); tie shows "Lowest price"`);
   await ev(`document.getElementById('more').open=true`);
   const firstRow = await ev(`document.querySelector('#list .row').dataset.id`);
   await click('#list .row [data-show]');
@@ -308,7 +339,14 @@ try {
   const partialMarkers = await ev(`[...document.querySelectorAll('.leaflet-marker-icon[data-id]')].map(m=>m.dataset.tier)`);
   assert.ok(partialMarkers.length > 0 && !partialMarkers.includes('min'), 'no green markers with incomplete coverage');
   assert.match(await text('#legend'), /incomplete data, no confirmed cheapest/);
-  ok('partial coverage labelled "Incomplete", outdated, refresh countdown; refresh disabled; no green markers');
+  // Selected station with incomplete data: "lowest observed", never "cheapest".
+  await ev(`document.querySelector('.leaflet-marker-icon[data-id]').click()`);
+  await sleep(200);
+  const pgap = await text('#best .gap');
+  assert.match(pgap, /lowest observed price/);
+  assert.doesNotMatch(pgap, /^Lowest price$|above the cheapest price/);
+  await click('#show-cheapest');
+  ok('partial coverage labelled "Incomplete", outdated, refresh countdown; refresh disabled; no green markers; selection says "lowest observed"');
 
   mode = 'ratelimit';
   await click('input[name=radius][value="17"]'); // larger radius → needs a new request
@@ -333,7 +371,15 @@ try {
   assert.equal(await ev(`document.querySelector('a.back').href`), 'https://nastya-star.github.io/anastasiia-stepanenko/de/');
   assert.equal(await text('a.back'), '← Zurück zur Hauptwebsite');
   assert.match(await text('#legend'), /Günstigster 1,900 €\/L/);
-  ok('DE page: location, radius and preference kept; German labels, legend and return link; decimal comma');
+  await ev(`document.querySelector('.leaflet-marker-icon[data-tier=above]').click()`);
+  await sleep(200);
+  assert.equal(await text('#best-h'), 'Ausgewählte Tankstelle');
+  assert.match(await text('#best .gap'), /^\d+(,\d)? ct\/L über dem günstigsten Preis$/);
+  assert.equal(await text('#show-cheapest'), 'Günstigste Tankstelle anzeigen');
+  assert.equal(await text('#best .acts a'), 'Route planen');
+  await click('#show-cheapest');
+  assert.equal(await text('#best-h'), 'Beste Tankstelle');
+  ok('DE page: location, radius and preference kept; German labels, legend and return link; decimal comma; German selected-station panel');
   await click('.lang a[data-lang=en]');
   await sleep(400);
   await waitFor(`document.documentElement.lang==='en'`, 'English page');
