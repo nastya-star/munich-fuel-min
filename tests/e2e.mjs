@@ -174,6 +174,9 @@ try {
   assert.equal(await view(), view0, 'switching fuel keeps zoom and position');
   assert.equal(apiCalls.length, api0, 'switching fuel makes no API request');
   assert.ok(process.env.REAL_TILES || tileCalls > 0, 'tiles requested from the configured provider (intercepted)');
+  await waitFor(`document.querySelectorAll('.leaflet-tile-loaded').length>0`, 'tiles loaded');
+  assert.equal(await ev(`[...document.querySelectorAll('.leaflet-tile-loaded')].every(t=>getComputedStyle(t).opacity==='1')`), true, 'loaded tiles are visible (no stuck fade at opacity 0)');
+  assert.equal(await ev(`performance.getEntriesByType('resource').some(r=>/marker-(icon|shadow)\.png/.test(r.name))`), false, 'no default marker image requested');
   await click('.leaflet-control-zoom-in');
   await sleep(400);
   await ev(`document.querySelector('.leaflet-map-pane').dispatchEvent(new Event('mousedown'))`);

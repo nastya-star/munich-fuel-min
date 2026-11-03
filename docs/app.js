@@ -552,7 +552,9 @@ const map = (() => {
     if (els.mapEl) fill(els.mapEl, el('p', { class: 'empty' }, M.mapUnavailable));
     return null;
   }
-  const m = window.L.map(els.mapEl, { zoomControl: true, attributionControl: true, minZoom: 6, maxZoom: TILES.maxZoom });
+  // fadeAnimation off: Leaflet fades tiles in with requestAnimationFrame, which browsers pause for
+  // pages loaded in a background tab or hidden pane; tiles could then stay at opacity 0 (black map).
+  const m = window.L.map(els.mapEl, { zoomControl: true, attributionControl: true, minZoom: 6, maxZoom: TILES.maxZoom, fadeAnimation: false });
   window.L.tileLayer(TILES.url, { maxZoom: TILES.maxZoom, attribution: TILES.attribution, className: TILES.className }).addTo(m);
   m.setView([state.location.lat, state.location.lng], 11);
   return m;
@@ -611,7 +613,8 @@ function renderMap(visible, colors) {
     mapState.markers.clear();
     mapState.stations.clear();
     for (const s of visible) {
-      const mk = L.marker([s.lat, s.lng], { keyboard: false, riseOnHover: true });
+      // Created with its final icon, so Leaflet never requests its default marker image.
+      const mk = L.marker([s.lat, s.lng], { icon: icon(colors.byId.get(s.id), s.id === state.selectedId), keyboard: false, riseOnHover: true });
       mk.bindPopup(() => popupContent(s.id), { maxWidth: 260, autoPanPadding: [16, 16] });
       mk.on('click', () => selectStation(s.id));
       mk.addTo(map);
