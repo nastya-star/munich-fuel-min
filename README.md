@@ -79,6 +79,8 @@ npx wrangler deploy                             # prints https://munich-fuel-min
 
 Then set `API_BASE` in `docs/app.js` to the printed URL (it contains no secret), commit and push.
 
+**Live backend:** `https://munich-fuel-min.stepanenkon010.workers.dev/api/prices`. If `wrangler deploy` fails with *code 10063*, the account has no workers.dev subdomain yet: open **Workers & Pages** in the Cloudflare dashboard once, then deploy again. Run all `wrangler` commands from `worker/` so `wrangler.toml` (Durable Object binding and migration) is picked up.
+
 Check that it works: `curl -s https://munich-fuel-min.<subdomain>.workers.dev/api/prices | head -c 300`. A response with `"ok":true` and stations means the key is active. `upstream_key_rejected` means the key is not activated yet: confirm the email from Tankerkönig.
 
 Free-plan usage is tiny: each click is one Worker request plus one Durable Object request, and at most one upstream request per minute.

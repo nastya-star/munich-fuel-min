@@ -3,7 +3,7 @@
 import { FUELS, minimum, eligible, byPrice, formatMilli, formatKm, formatBerlin, displayName, address, directionsUrl } from './core.js';
 
 // Public URL of the Cloudflare Worker (worker/). Contains no secret.
-const API_BASE = 'REPLACE_WITH_WORKER_URL';
+const API_BASE = 'https://munich-fuel-min.stepanenkon010.workers.dev';
 
 const lang = document.documentElement.lang === 'de' ? 'de' : 'en';
 const M = {

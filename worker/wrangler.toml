@@ -5,6 +5,7 @@ name = "munich-fuel-min"
 main = "src/index.js"
 compatibility_date = "2025-06-01"
 workers_dev = true
+preview_urls = false
 
 [vars]
 ALLOWED_ORIGINS = "https://nastya-star.github.io"
