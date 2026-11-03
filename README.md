@@ -57,6 +57,38 @@ The terms also ask public sites not to filter results unless the user explicitly
 | `worker/` | Cloudflare Worker + Durable Object (`src/index.js`, `src/gate.js`, `src/normalize.js`, `wrangler.toml`) |
 | `tests/*.test.mjs` | Unit tests: minimum, ties, unavailable fuels, closed stations, price validation, cache, 1/min limit, concurrency (`node --test "tests/*.test.mjs"`) |
 | `tests/integration.mjs` | Runs the real Worker in workerd against a mock list.php: 40 concurrent requests → 1 upstream call, cache, stale labelling, key redaction, Origin check (`node tests/integration.mjs`, about 2.5 min) |
+| `tools/inspect.mjs` | Local, developer-only data inspector (not published): raw JSON, table, field list, search, filters and CSV export |
+
+## Data and fuel types
+
+| Layer | Fuel types | Source |
+| --- | --- | --- |
+| MTS-K (Bundeskartellamt) | **Super E5, Super E10, Diesel** only | [MTSKraftV §4(2)](https://www.gesetze-im-internet.de/mtskraftv/BJNR059500013.html). Premium grades (Super Plus 98, Ultimate 102, V-Power, premium diesel), LPG, CNG and AdBlue are not in the reporting duty. |
+| Tankerkönig API | `e5`, `e10`, `diesel` | [API documentation](https://creativecommons.tankerkoenig.de/?page=info) |
+| This project | `e5`, `e10`, `diesel` | `worker/src/normalize.js` (`FUELS`) |
+
+Key facts:
+- **Missing fuels:** a station that does not sell a fuel, or has no valid price for it, gets `null` in the Worker output. The raw API may send `false`.
+- **Timestamps:** the live endpoints (`list.php`, `prices.php`, `detail.php`) have no per-station price timestamp. The only time available is the retrieval time (`fetchedAt`). MTS-K receives the time of each change, but Tankerkönig exposes those times only in its historical data (CC BY-NC-SA, bulk), which this project does not use.
+- **Field differences:** the raw `list.php` station fields are `id, name, brand, street, houseNumber, postCode (int), place, lat, lng, dist, e5, e10, diesel (float), isOpen`. The Worker keeps all of them, but turns `postCode` into a zero-padded string and moves prices into `prices: {e5, e10, diesel}` as integer thousandths of a euro (or `null`). `detail.php` adds `openingTimes`, `overrides`, `wholeDay` and `state`.
+
+## Developer data inspector
+
+`tools/inspect.mjs` is a small local web page for looking at the data. It needs no dependencies, binds to `127.0.0.1` only, and is not published. It fetches only when you click **Fetch**.
+
+```bash
+node tools/inspect.mjs                 # data from the deployed Worker (no key; shares the 60 s cache)
+```
+
+```bash
+TANKERKOENIG_API_KEY=… node tools/inspect.mjs --raw   # raw list.php, plus detail.php per station
+```
+
+Then open http://127.0.0.1:8790.
+
+- **Views:** a table (one row per station and fuel), fields (every key with its observed types and meaning) and raw JSON. You can search by name, brand, street, place or ID, filter by fuel and availability, sort by any column, and export the current rows as CSV.
+- **`--raw` and the key:** `--raw` reads the key from the environment, never prints it, and redacts it from everything it shows.
+- **`--raw` and the limit:** it uses the same key as the live site, whose limit is 1 request per minute. The tool therefore allows at most one upstream request per 60 s; the timestamp is kept in a temp file. That guard does not know about the site's own requests, so if the site was just used, Tankerkönig may answer with a rate-limit error. Use `--raw` sparingly, and never in a loop.
 
 ## Deployment
 
