@@ -1,0 +1,60 @@
+# Runs the existing test suites on every push and pull request.
+# No secrets are used and nothing contacts Tankerkönig: the integration test runs the Worker in
+# workerd against a local mock of list.php, and the browser test mocks the API, geocoder and tiles.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Unit tests + generated pages up to date
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test "tests/*.test.mjs"
+      - name: docs/ matches build.mjs
+        run: |
+          node build.mjs
+          git diff --exit-code -- docs/
+
+  integration:
+    name: Worker integration (workerd, mock upstream)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - run: npm ci
+        working-directory: worker
+      - run: node tests/integration.mjs
+
+  e2e:
+    name: Browser E2E (headless Chrome, mocked services)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node tests/e2e.mjs
+        env:
+          CHROME_PATH: /usr/bin/google-chrome

@@ -60,7 +60,8 @@ const GEO = [
 ];
 
 // ---- Chrome via CDP ----------------------------------------------------------------------------------
-const proc = spawn(CHROME, ['--headless=new', '--remote-debugging-port=9335', `--user-data-dir=${mkdtempSync(join(tmpdir(), 'e2e-'))}`, '--no-first-run', '--lang=en-US', '--window-size=1100,900', 'about:blank'], { stdio: 'ignore' });
+// GitHub-hosted Ubuntu runners restrict the user namespaces Chrome sandboxing needs.
+const proc = spawn(CHROME, [...(process.env.CI ? ['--no-sandbox'] : []), '--headless=new', '--remote-debugging-port=9335', `--user-data-dir=${mkdtempSync(join(tmpdir(), 'e2e-'))}`, '--no-first-run', '--lang=en-US', '--window-size=1100,900', 'about:blank'], { stdio: 'ignore' });
 let ws; let id = 0; const pending = new Map(); let session;
 const send = (method, params = {}, sessionId = session) => new Promise((res) => { const i = ++id; pending.set(i, res); ws.send(JSON.stringify({ id: i, method, params, sessionId })); });
 const ev = async (expr) => { const r = await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true }); if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || 'eval error'); return r.result?.value; };
