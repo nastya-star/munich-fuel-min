@@ -1,10 +1,12 @@
-// Renders the approved article content/how-it-works.md into docs/how-it-works.html.
+// Renders the approved articles into static pages:
+//   content/how-it-works.md    -> docs/how-it-works.html     (English)
+//   content/how-it-works.de.md -> docs/de/how-it-works.html  (German)
 //
-// The Markdown file is the author's final text and is stored byte-for-byte (see .gitattributes).
-// This renderer changes presentation only: Markdown syntax becomes HTML, and the math (whose
-// LaTeX delimiters were lost on export, e.g. "(t_i)" for \(t_i\)) becomes native MathML from the
-// explicit table below. An expression missing from the table fails the build instead of
-// rendering incorrectly. tests/article.test.mjs checks that the page text equals the source text.
+// The Markdown files are the author's final texts and are stored byte-for-byte (see .gitattributes).
+// This renderer changes presentation only: Markdown syntax becomes HTML, and the math becomes native
+// MathML from the explicit tables below. The English export lost its LaTeX delimiters ("(t_i)" for
+// \(t_i\)); the German file keeps them (\(t_i\)). An expression missing from the tables fails the
+// build instead of rendering incorrectly. tests/article.test.mjs checks page text == source text.
 
 const SITE = 'https://nastya-star.github.io/munich-fuel-min/';
 const MAIN_SITE = 'https://nastya-star.github.io/anastasiia-stepanenko/';
@@ -21,28 +23,43 @@ const P_IF = sub(mi('p'), if_); // p_{i,f}
 const T_I = sub(mi('t'), mi('i')); // t_i
 const S_F = `${sub(mi('S'), mi('f'))}${paren(args('x', 'r', 't'))}`; // S_f(x,r,t)
 const P_STAR = `<msubsup>${mi('p')}${mi('f')}<mo>*</mo></msubsup>${paren(args('x', 'r', 't'))}`; // p_f^*(x,r,t)
-
-/** Source expression (as written in the Markdown) -> MathML content. */
-export const INLINE_MATH = {
-  'i': mi('i'),
-  'f': mi('f'),
-  'x': mi('x'),
-  'r': mi('r'),
-  't': mi('t'),
-  'n': mi('n'),
-  't_i': T_I,
-  '\\tau': mi('τ'),
-  'p\\_{i,f}(t_i)': `${P_IF}${paren(T_I)}`,
-  'S_f(x,r,t)': S_F,
-  'p_f^\\*(x,r,t)': P_STAR,
-  '\\operatorname\\*{arg,min}': `<mi mathvariant="normal">arg</mi><mspace width="0.1667em"/><mi mathvariant="normal">min</mi>`, // "," = lost "\," (thin space)
-  'O(n)': `${mi('O')}${paren(mi('n'))}`,
-  '\\widehat p\\_{i,f}(\\tau)': `${sub(`<mover accent="true">${mi('p')}<mo>^</mo></mover>`, if_)}${paren(mi('τ'))}`,
+const M = {
+  i: mi('i'), f: mi('f'), x: mi('x'), r: mi('r'), t: mi('t'), n: mi('n'), tau: mi('τ'), ti: T_I,
+  pif: `${P_IF}${paren(T_I)}`,
+  sf: S_F,
+  pstar: P_STAR,
+  argmin: `<mi mathvariant="normal">arg</mi><mspace width="0.1667em"/><mi mathvariant="normal">min</mi>`,
+  on: `${mi('O')}${paren(mi('n'))}`,
+  phat: `${sub(`<mover accent="true">${mi('p')}<mo>^</mo></mover>`, if_)}${paren(mi('τ'))}`,
 };
 
-// The objective in section 02.2. Its export lost the opening "\[\boxed{p_f^*(x,r,t) =" (only the
-// closing "}" and "]" survived); the left-hand side is the quantity the next paragraph defines.
+/** English source: math written in plain parentheses (delimiters lost on export). */
+export const INLINE_MATH = {
+  'i': M.i, 'f': M.f, 'x': M.x, 'r': M.r, 't': M.t, 'n': M.n, 't_i': M.ti, '\\tau': M.tau,
+  'p\\_{i,f}(t_i)': M.pif,
+  'S_f(x,r,t)': M.sf,
+  'p_f^\\*(x,r,t)': M.pstar,
+  '\\operatorname\\*{arg,min}': M.argmin, // "," = lost "\," (thin space)
+  'O(n)': M.on,
+  '\\widehat p\\_{i,f}(\\tau)': M.phat,
+};
+
+/** German source: proper \( … \) delimiters. */
+export const LATEX_MATH = {
+  'i': M.i, 'f': M.f, 'x': M.x, 'r': M.r, 't': M.t, 'n': M.n, 't_i': M.ti, '\\tau': M.tau,
+  'p_{i,f}(t_i)': M.pif,
+  'S_f(x,r,t)': M.sf,
+  'p_f^*(x,r,t)': M.pstar,
+  '\\operatorname*{arg\\,min}': M.argmin,
+  'O(n)': M.on,
+  '\\widehat p_{i,f}(\\tau)': M.phat,
+};
+
+// The objective in section 02.2: p_f^*(x,r,t) = min_{i in S_f(x,r,t)} p_{i,f}(t_i), boxed.
+// The English export lost the opening "\[\boxed{p_f^*(x,r,t) =" (only the closing "}" and "]"
+// survived); the author confirmed the full formula. The German file contains it intact.
 export const DISPLAY_SOURCE = '\\min\\_{i\\in S_f(x,r,t)}\\\np\\_{i,f}(t_i)\\\n}\\\n]';
+export const DISPLAY_SOURCE_DE = '\\[\n\\boxed{\np_f^*(x,r,t)\n=\n\\min_{i\\in S_f(x,r,t)} p_{i,f}(t_i)\n}\n\\]';
 const DISPLAY_MATH = `${P_STAR}${mo('=')}<munder><mo movablelimits="false">min</mo><mrow>${mi('i')}${mo('∈')}${S_F}</mrow></munder>${P_IF}${paren(T_I)}`;
 
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -50,18 +67,26 @@ const mathEl = (tex, body, display = false) => `<math${display ? ' display="bloc
 
 // ---- inline Markdown ---------------------------------------------------------------------------
 
-function inline(text) {
+/** mode 'parens': math in plain (…) groups (English); mode 'latex': math in \( … \) (German). */
+function inline(text, mode) {
   const keep = [];
   const hold = (html) => `\u0000${keep.push(html) - 1}\u0000`;
   let s = text;
   // links first, so their (url) is not mistaken for math
   s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, label, url) => hold(`<a href="${esc(url)}"${url.startsWith('http') && !url.startsWith(SITE) ? ' rel="noopener"' : ''}>${esc(label)}</a>`));
   s = s.replace(/`([^`]+)`/g, (_, code) => hold(`<code>${esc(code)}</code>`));
-  // math: a parenthesised group (one level of nesting) whose content is in the table
-  s = s.replace(/\(((?:[^()]|\([^()]*\))*)\)/g, (m, tex) => {
-    if (INLINE_MATH[tex] === undefined) throw new Error(`article.mjs: no MathML for "(${tex})" - add it to INLINE_MATH`);
-    return hold(mathEl(tex, INLINE_MATH[tex]));
-  });
+  if (mode === 'latex') {
+    s = s.replace(/\\\((.+?)\\\)/g, (_, tex) => {
+      if (LATEX_MATH[tex] === undefined) throw new Error(`article.mjs: no MathML for "\\(${tex}\\)" - add it to LATEX_MATH`);
+      return hold(mathEl(tex, LATEX_MATH[tex]));
+    });
+  } else {
+    // a parenthesised group (one level of nesting) whose content is in the table
+    s = s.replace(/\(((?:[^()]|\([^()]*\))*)\)/g, (_, tex) => {
+      if (INLINE_MATH[tex] === undefined) throw new Error(`article.mjs: no MathML for "(${tex})" - add it to INLINE_MATH`);
+      return hold(mathEl(tex, INLINE_MATH[tex]));
+    });
+  }
   s = esc(s);
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>');
   return s.replace(/\u0000(\d+)\u0000/g, (_, i) => keep[Number(i)]);
@@ -69,12 +94,16 @@ function inline(text) {
 
 // ---- blocks ----------------------------------------------------------------------------------------
 
+const HARD_BREAK = /\\\n| {2,}\n/; // Markdown line break: trailing backslash or two spaces
+
 function blocks(md) {
+  // A two-space line break sits inside a block, so trimming block ends keeps it.
   return md.replace(/\r\n/g, '\n').trim().split(/\n{2,}/).map((b) => b.trim());
 }
 
-/** Returns {title, subtitle, sections:[{num, title, html}], closing:html} from the Markdown. */
+/** Returns {title, subtitle, sections:[{num, title, html}], closing:[html]} from the Markdown. */
 export function parseArticle(md) {
+  const mode = /\\\(/.test(md) ? 'latex' : 'parens';
   let title = '';
   let subtitle = '';
   const sections = [];
@@ -83,11 +112,11 @@ export function parseArticle(md) {
   let afterLastRule = false;
   for (const b of blocks(md)) {
     if (b.startsWith('# ')) { title = b.slice(2); continue; }
-    if (!sections.length && /^\*[^*].*\*$/.test(b) && !subtitle) { subtitle = inline(b); continue; }
+    if (!sections.length && /^\*[^*].*\*$/.test(b) && !subtitle) { subtitle = inline(b, mode); continue; }
     if (b === '---') { if (current) afterLastRule = true; continue; }
     const h2 = /^## (?:(\d\d) )?(.+)$/.exec(b);
     if (h2) {
-      current = { num: h2[1] || '', title: h2[2], html: [] };
+      current = { num: h2[1] || '', title: inline(h2[2], mode), html: [] };
       sections.push(current);
       afterLastRule = false;
       continue;
@@ -95,10 +124,10 @@ export function parseArticle(md) {
     // Everything after the final rule that follows the last section is the closing note.
     const target = afterLastRule ? closing : current.html;
     const h3 = /^### (\d\d\.\d) (.+)$/.exec(b);
-    if (h3) { target.push(`<h3><span>${h3[1]}</span> ${inline(h3[2])}</h3>`); continue; }
-    if (b === DISPLAY_SOURCE) { target.push(`<div class="eq"><span class="box">${mathEl('DISPLAY', DISPLAY_MATH, true)}</span></div>`); continue; }
-    if (b.includes('\\\n')) { target.push(`<p class="sign">${b.split('\\\n').map(inline).join('<br>')}</p>`); continue; }
-    target.push(`<p>${inline(b)}</p>`);
+    if (h3) { target.push(`<h3><span>${h3[1]}</span> ${inline(h3[2], mode)}</h3>`); continue; }
+    if (b === DISPLAY_SOURCE || b === DISPLAY_SOURCE_DE) { target.push(`<div class="eq"><span class="box">${mathEl('DISPLAY', DISPLAY_MATH, true)}</span></div>`); continue; }
+    if (HARD_BREAK.test(b)) { target.push(`<p class="sign">${b.split(HARD_BREAK).map((l) => inline(l, mode)).join('<br>')}</p>`); continue; }
+    target.push(`<p>${inline(b, mode)}</p>`);
   }
   if (!title || !sections.length) throw new Error('article.mjs: unexpected article structure');
   return { title, subtitle, sections, closing };
@@ -141,30 +170,47 @@ hr{border:0;border-top:1px solid var(--faint);margin:2rem 0 1.6rem}
 .sign{line-height:1.5}
 @media(max-width:30rem){.card{padding:1.1rem .95rem}.eq .box{padding:.35em .5em}.eq math{font-size:1.2em}}`;
 
-function nav(where) {
-  return `<nav class="nav${where === 'bottom' ? ' bottom' : ''}" aria-label="${where === 'top' ? 'Back navigation' : 'Back navigation (end of article)'}" data-chrome><a href="${MAIN_SITE}">← Back to my website</a><a href="${SITE}">← Back to fuel minimisation</a></nav>`;
+const PAGES = {
+  en: {
+    path: 'how-it-works.html',
+    nav: [[MAIN_SITE, '← Back to my website'], [SITE, '← Back to fuel minimisation']],
+    navLabel: ['Back navigation', 'Back navigation (end of article)'],
+  },
+  de: {
+    path: 'de/how-it-works.html',
+    nav: [[`${MAIN_SITE}de/`, '← Zurück zur Hauptwebsite'], [`${SITE}de/`, '← Zurück zu Munich Fuel Minimum']],
+    navLabel: ['Zurück-Navigation', 'Zurück-Navigation (Ende des Artikels)'],
+  },
+};
+
+function nav(lang, where) {
+  const p = PAGES[lang];
+  return `<nav class="nav${where === 'bottom' ? ' bottom' : ''}" aria-label="${p.navLabel[where === 'top' ? 0 : 1]}" data-chrome>${p.nav.map(([href, label]) => `<a href="${href}">${label}</a>`).join('')}</nav>`;
 }
 
-export function renderArticlePage(md) {
+export function renderArticlePage(md, lang = 'en') {
   const a = parseArticle(md);
   const plain = (html) => html.replace(/<[^>]+>/g, '');
+  const description = a.subtitle ? plain(a.subtitle) : `${a.title} – Munich Fuel Minimum`;
   const sec = a.sections
     .map((s, i) => {
       const id = `s${i + 1}`;
       const end = s.num ? '' : ' end';
-      return `<section class="card${end}" aria-labelledby="${id}">\n<h2 id="${id}">${s.num ? `<span>${s.num}</span> ` : ''}${inline(s.title)}</h2>\n${s.html.join('\n')}\n</section>`;
+      return `<section class="card${end}" aria-labelledby="${id}">\n<h2 id="${id}">${s.num ? `<span>${s.num}</span> ` : ''}${s.title}</h2>\n${s.html.join('\n')}\n</section>`;
     })
     .join('\n');
   return `<!doctype html>
-<html lang="en">
+<html lang="${lang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(a.title)} · Munich Fuel Minimum</title>
-<meta name="description" content="${esc(plain(a.subtitle))}">
+<meta name="description" content="${esc(description)}">
 <meta name="theme-color" content="#111111">
 <meta name="color-scheme" content="dark">
-<link rel="canonical" href="${SITE}how-it-works.html">
+<link rel="canonical" href="${SITE}${PAGES[lang].path}">
+<link rel="alternate" hreflang="en" href="${SITE}${PAGES.en.path}">
+<link rel="alternate" hreflang="de" href="${SITE}${PAGES.de.path}">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23111'/%3E%3Cpath d='M10 25V9a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M9 25h12M12.5 11h5v4h-5zM20 14h1.5a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 0 3 0V12l-3-3' fill='none' stroke='%23F5F3EE' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
 ${CSS}
@@ -172,19 +218,18 @@ ${CSS}
 </head>
 <body>
 <main>
-${nav('top')}
+${nav(lang, 'top')}
 <article>
 <header>
 <h1>${esc(a.title)}</h1>
-<p class="sub">${a.subtitle}</p>
-</header>
+${a.subtitle ? `<p class="sub">${a.subtitle}</p>\n` : ''}</header>
 ${sec}
 <hr>
 <div class="closing">
 ${a.closing.join('\n')}
 </div>
 </article>
-${nav('bottom')}
+${nav(lang, 'bottom')}
 </main>
 </body>
 </html>

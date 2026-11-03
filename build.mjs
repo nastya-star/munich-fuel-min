@@ -42,6 +42,7 @@ const T = {
     fuelLabel: 'Fuel',
     showMore: 'Show more',
     howBtn: 'How does it work?',
+    howPath: 'how-it-works.html',
     noscript: 'This page needs JavaScript to request current prices.',
     howTitle: 'How it works',
     how: [
@@ -87,6 +88,7 @@ const T = {
     fuelLabel: 'Kraftstoff',
     showMore: 'Mehr anzeigen',
     howBtn: 'Wie funktioniert es?',
+    howPath: 'de/how-it-works.html',
     noscript: 'Diese Seite benötigt JavaScript, um aktuelle Preise abzufragen.',
     howTitle: 'So funktioniert es',
     how: [
@@ -353,7 +355,7 @@ ${['e5', 'e10', 'diesel'].map((f, i) => `<button type="button" class="card" data
 </div>
 </details>
 
-<p class="howto"><a class="btn" href="${SITE}how-it-works.html" hreflang="en">${t.howBtn}</a></p>
+<p class="howto"><a class="btn" href="${SITE}${t.howPath}">${t.howBtn}</a></p>
 
 <footer>
 <details><summary>${t.howTitle}</summary>${t.how.map((p) => `<p>${p}</p>`).join('')}</details>
@@ -373,5 +375,6 @@ mkdirSync('docs/de', { recursive: true });
 writeFileSync('docs/index.html', page('en'));
 writeFileSync('docs/de/index.html', page('de'));
 // Article: rendered from the approved Markdown on every build (text unchanged; see article.mjs).
-writeFileSync('docs/how-it-works.html', renderArticlePage(readFileSync('content/how-it-works.md', 'utf8')));
-console.log('Built docs/index.html, docs/de/index.html and docs/how-it-works.html');
+writeFileSync('docs/how-it-works.html', renderArticlePage(readFileSync('content/how-it-works.md', 'utf8'), 'en'));
+writeFileSync('docs/de/how-it-works.html', renderArticlePage(readFileSync('content/how-it-works.de.md', 'utf8'), 'de'));
+console.log('Built docs/index.html, docs/de/index.html, docs/how-it-works.html and docs/de/how-it-works.html');
