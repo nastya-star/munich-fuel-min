@@ -140,6 +140,110 @@ export function priceColors(stations, fuel, { complete }) {
   return { byId, min: distinct[0] ?? null, max: distinct.at(-1) ?? null, distinct, complete };
 }
 
+// ---- price histogram and savings ----------------------------------------------------------------
+// Prepared once per dataset (snapshot, location, radius, fuel, open-only filter); selecting a station
+// or moving the litre slider then only looks values up: no sorting, no binning.
+
+// Bin widths in thousandths of a euro: 0.1 ct, 0.2 ct, 0.5 ct, 1 ct, 2 ct, 5 ct, 10 ct, …
+const BIN_WIDTHS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
+
+/** Most bins for n prices: about 2·√n, at least 5, at most 14 (8–14 for 16+ stations). */
+export const maxBins = (n) => Math.min(14, Math.max(5, Math.ceil(2 * Math.sqrt(n))));
+
+/**
+ * Statistics of the valid `fuel` prices of `stations` (all integers, thousandths of a euro):
+ *  - histogram: bins [start + i·width, start + (i+1)·width), equal width, aligned to the width,
+ *    counts and pct = 100·count/n (n = stations with a valid price);
+ *  - per distinct price: its bin and the differences to the nearest/farthest cheaper and dearer
+ *    prices (equal prices excluded), used for the savings ranges.
+ * One pass over the stations, one sort of the DISTINCT prices.
+ */
+export function priceStats(stations, fuel) {
+  const priceById = new Map();
+  const freq = new Map();
+  for (const s of stations) {
+    const p = validPrice(s, fuel);
+    if (p === null || priceById.has(s.id)) continue;
+    priceById.set(s.id, p);
+    freq.set(p, (freq.get(p) || 0) + 1);
+  }
+  const n = priceById.size;
+  if (n === 0) return { fuel, n: 0, priceById, distinct: [], counts: [], pct: [], info: new Map(), min: null, max: null, start: 0, width: 0 };
+  const distinct = [...freq.keys()].sort((a, b) => a - b);
+  const min = distinct[0];
+  const max = distinct[distinct.length - 1];
+  const limit = maxBins(n);
+  const width = BIN_WIDTHS.find((w) => Math.floor(max / w) - Math.floor(min / w) + 1 <= limit) ?? BIN_WIDTHS[BIN_WIDTHS.length - 1];
+  const first = Math.floor(min / width);
+  const counts = new Array(Math.floor(max / width) - first + 1).fill(0);
+  const info = new Map();
+  distinct.forEach((p, i) => {
+    const bin = Math.floor(p / width) - first;
+    counts[bin] += freq.get(p);
+    info.set(p, {
+      price: p,
+      bin,
+      // cheaper: p − (highest price below p) … p − (lowest price); dearer: (lowest above) − p … max − p
+      cheaper: i > 0 ? [p - distinct[i - 1], p - min] : null,
+      dearer: i < distinct.length - 1 ? [distinct[i + 1] - p, max - p] : null,
+    });
+  });
+  return { fuel, n, priceById, distinct, counts, pct: counts.map((c) => (100 * c) / n), info, min, max, start: first * width, width };
+}
+
+/** The prepared entry of one station (price, bin, differences), or null without a valid price. O(1). */
+export function stationEntry(stats, id) {
+  const p = stats.priceById.get(id);
+  return p === undefined ? null : stats.info.get(p);
+}
+
+/** Litres × difference (thousandths of a euro) → whole cents, rounded once at the end. */
+export const litreCents = (litres, diffMilli) => Math.round((litres * diffMilli) / 10);
+
+/** Savings ranges in cents for `litres`: {cheaper: [X, Y] | null, dearer: [A, B] | null}. O(1). */
+export function savings(entry, litres) {
+  return {
+    cheaper: entry.cheaper && [litreCents(litres, entry.cheaper[0]), litreCents(litres, entry.cheaper[1])],
+    dearer: entry.dearer && [litreCents(litres, entry.dearer[0]), litreCents(litres, entry.dearer[1])],
+  };
+}
+
+/** 123 cents -> "€1.23" (en) / "1,23 €" (de); `bare` omits the symbol. */
+const MONEY = { en: new Intl.NumberFormat('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), de: new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) };
+export function formatEuroCents(cents, lang, bare = false) {
+  const n = MONEY[lang === 'de' ? 'de' : 'en'].format(cents / 100);
+  return bare ? n : lang === 'de' ? `${n} €` : `€${n}`;
+}
+/** Range "€0.80–€1.20" / "0,80–1,20 €"; a single amount when both ends are equal. */
+export function formatEuroRange([a, b], lang) {
+  if (a === b) return formatEuroCents(a, lang);
+  return lang === 'de' ? `${formatEuroCents(a, lang, true)}–${formatEuroCents(b, lang)}` : `${formatEuroCents(a, lang)}–${formatEuroCents(b, lang)}`;
+}
+
+/**
+ * Cache of priceStats per dataset. `snapshot` identifies the loaded response: when it changes
+ * (new data, refresh, partial/stale replacement) all entries are dropped. Within a snapshot the key
+ * holds location, radius, fuel and the open-only filter.
+ */
+export function statsCache(compute = priceStats) {
+  const entries = new Map();
+  let snap;
+  const cache = {
+    builds: 0,
+    get(snapshot, key, stations, fuel) {
+      if (snapshot !== snap) { entries.clear(); snap = snapshot; }
+      let st = entries.get(key);
+      if (!st) {
+        st = compute(stations, fuel);
+        cache.builds++;
+        entries.set(key, st);
+      }
+      return st;
+    },
+  };
+  return cache;
+}
+
 // ---- formatting -------------------------------------------------------------------------------
 
 /** 1789 -> "1.789" (en) / "1,789" (de). Integer arithmetic only. */

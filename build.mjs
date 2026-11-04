@@ -31,6 +31,9 @@ const T = {
     legendNone: 'no price',
     detailTitle: 'Best station',
     moreTitle: 'Compare stations',
+    histLabel: 'Price distribution and savings',
+    litres: 'How much will you refuel?',
+    pct0: '0%',
     listSearch: 'Search stations',
     listSearchPh: 'Name, brand or town',
     sortLabel: 'Sort',
@@ -77,6 +80,9 @@ const T = {
     legendNone: 'kein Preis',
     detailTitle: 'Beste Tankstelle',
     moreTitle: 'Tankstellen vergleichen',
+    histLabel: 'Preisverteilung und Ersparnis',
+    litres: 'Wie viel möchten Sie tanken?',
+    pct0: '0 %',
     listSearch: 'Tankstellen durchsuchen',
     listSearchPh: 'Name, Marke oder Ort',
     sortLabel: 'Sortierung',
@@ -227,6 +233,26 @@ input::placeholder{color:#8f8b83}
 .howto .btn.article:hover{background:#e6e3dc;border-color:#e6e3dc}
 .howto .btn.article:active{background:#d6d2c8}
 .howto .btn.article:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
+/* price histogram + savings (shown for a selected station; bars and labels are kept and updated in place) */
+.hist{margin-top:1.5rem;padding:1rem .9rem;border:1px solid var(--faint);border-radius:var(--r);display:grid;gap:.9rem}
+.hist[hidden],.hist [hidden]{display:none}
+.hist p{margin:0}
+.hist-sel{font:400 1.1rem/1.3 var(--serif)}
+.hist-plot{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:7.5rem auto;column-gap:.5rem}
+.hist-y{display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;font-size:.75rem;line-height:1;color:var(--mute);font-variant-numeric:tabular-nums}
+.hist-bars{display:flex;align-items:flex-end;gap:2px;border-top:1px dashed var(--faint);border-bottom:1px solid var(--soft)}
+.hist-bars .b{flex:1 1 0;min-width:0;background:rgba(245,243,238,.3);border-radius:2px 2px 0 0}
+.hist-bars .b.on{background:var(--fg)}
+.hist-u{padding-top:.3rem;font-size:.75rem;color:var(--mute);text-align:right}
+.hist-x{position:relative;height:1.35rem;font-size:.75rem;color:var(--mute);font-variant-numeric:tabular-nums}
+.hist-x span{position:absolute;top:.3rem;transform:translateX(-50%);white-space:nowrap}
+.hist-x span:first-child{transform:none}
+.hist-x span:last-child{transform:translateX(-100%)}
+.litres{display:grid;grid-template-columns:1fr auto;gap:.2rem .75rem;align-items:center}
+.litres label{font-weight:600}
+.litres output{font-weight:600;font-variant-numeric:tabular-nums}
+.litres input{grid-column:1/-1;width:100%;min-height:2.6rem;margin:0;accent-color:var(--fg);cursor:pointer}
+.save{display:grid;gap:.35rem}
 details.more{margin-top:1.5rem;border:1px solid var(--soft);border-radius:var(--r)}
 details.more>summary{display:flex;justify-content:space-between;align-items:center;min-height:3rem;padding:.4rem .9rem;font:400 1.15rem var(--serif);cursor:pointer;list-style:none}
 details.more>summary::-webkit-details-marker{display:none}
@@ -344,6 +370,14 @@ ${['e5', 'e10', 'diesel'].map((f, i) => `<button type="button" class="card" data
 <div id="best" aria-live="polite"></div>
 </section>
 </div>
+
+<section class="hist" id="hist" aria-label="${t.histLabel}" hidden>
+<p class="hist-sel" id="hist-sel"></p>
+<p class="hist-msg" id="hist-msg" hidden></p>
+<div class="hist-plot" id="hist-plot"><div class="hist-y" aria-hidden="true"><span id="hist-ymax"></span><span>${t.pct0}</span></div><div class="hist-bars" id="hist-bars" role="img"></div><span class="hist-u" aria-hidden="true">€/L</span><div class="hist-x" id="hist-x" aria-hidden="true"></div></div>
+<div class="litres" id="litres-box"><label for="litres">${t.litres}</label><output id="litres-out" for="litres">40 L</output><input type="range" id="litres" min="5" max="100" step="5" value="40"></div>
+<div class="save" id="save"><p id="save-a"></p><p id="save-b"></p></div>
+</section>
 
 <details class="more" id="more">
 <summary><span id="more-title">${t.moreTitle}</span></summary>

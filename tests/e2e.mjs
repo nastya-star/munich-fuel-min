@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join, extname, normalize } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import assert from 'node:assert/strict';
-import { haversineKm, serverArea } from '../docs/core.js';
+import { haversineKm, serverArea, localStations, priceStats, stationEntry, savings, formatEuroRange } from '../docs/core.js';
 
 const CHROME = process.env.CHROME_PATH || ['C:/Program Files/Google/Chrome/Application/chrome.exe', '/usr/bin/google-chrome', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].find(existsSync);
 if (!CHROME) { console.log('SKIP: Chrome not found (set CHROME_PATH)'); process.exit(0); }
@@ -456,6 +456,114 @@ try {
   await waitFor(`document.querySelector('.card .p').textContent.includes('.')`, 'prices after migration');
   assert.equal(new URLSearchParams(apiCalls.at(-1)).get('rad'), String(serverArea({ lat: 48.1554264, lng: 11.5634866 }, 20).rad));
   ok('saved 17 km preference migrated to 20 km, location kept, 20 km area requested');
+
+  // 13. Price histogram + savings calculator -------------------------------------------------------------
+  {
+    const origin = { lat: 48.1554264, lng: 11.5634866 };
+    const expectStats = (fuel) => priceStats(localStations(STATIONS, origin, 20).filter((s) => s.isOpen), fuel);
+    const pick = async (id) => { await ev(`document.querySelector('.leaflet-marker-icon[data-id="${id}"]').click()`); await sleep(50); };
+    const histState = () => ev(`(()=>{const b=[...document.querySelectorAll('#hist-bars .b')];return {hidden:document.getElementById('hist').hidden,bars:b.length,on:b.map((x,i)=>x.classList.contains('on')?i:-1).filter(i=>i>=0),
+      heights:b.map(x=>parseFloat(x.style.height)),a:document.getElementById('save-a').hidden?'':document.getElementById('save-a').textContent,b:document.getElementById('save-b').hidden?'':document.getElementById('save-b').textContent,
+      sel:document.getElementById('hist-sel').textContent,label:document.getElementById('hist-bars').getAttribute('aria-label'),same:!!window.__bars&&b.length===window.__bars.length&&b.every((x,i)=>x===window.__bars[i]),muts:window.__muts||0,litres:document.getElementById('litres-out').textContent}})()`);
+    assert.equal((await histState()).hidden, true, 'hidden until a station is selected');
+    const e5 = expectStats('e5');
+    const ids = [...e5.priceById.entries()].sort((a, b) => a[1] - b[1]);
+    const [cheapId, cheapP] = ids[0];
+    const [dearId, dearP] = ids.at(-1);
+    const midId = ids.find(([, p]) => p > cheapP && p < dearP)[0];
+    const apiBefore = apiCalls.length; const geoBefore = geoCalls;
+    await ev(`performance.clearResourceTimings()`);
+
+    await pick(midId);
+    let h = await histState();
+    assert.equal(h.hidden, false);
+    assert.equal(h.bars, e5.counts.length, 'one bar per bin');
+    assert.deepEqual(h.on, [stationEntry(e5, midId).bin], 'exactly one highlighted bar: the selected price');
+    const top = Math.max(...h.heights);
+    e5.pct.forEach((p, i) => assert.ok(Math.abs(h.heights[i] / top - p / Math.max(...e5.pct)) < 0.01, `bar ${i} height ∝ ${p}%`));
+    const v40 = savings(stationEntry(e5, midId), 40);
+    assert.equal(h.a, `You could save ${formatEuroRange(v40.cheaper, 'en')} more at a cheaper station.`);
+    assert.equal(h.b, `You're already saving ${formatEuroRange(v40.dearer, 'en')} compared with more expensive stations.`);
+    assert.equal(h.litres, '40 L');
+    assert.match(h.label, /^Histogram of Super E5 prices at \d+ stations/);
+    assert.match(h.label, /The selected station is in \d\.\d{3}–\d\.\d{3} €\/L\.$/);
+    // From here on, the bars must stay the same nodes and the bar container must not change.
+    await ev(`window.__bars=[...document.querySelectorAll('#hist-bars .b')];window.__muts=0;new MutationObserver((m)=>{window.__muts+=m.length}).observe(document.getElementById('hist-bars'),{childList:true})`);
+
+    await pick(cheapId);
+    h = await histState();
+    assert.deepEqual(h.on, [stationEntry(e5, cheapId).bin]);
+    assert.ok(h.same && h.muts === 0, 'selection did not rebuild the histogram');
+    assert.equal(h.a, 'This is the lowest price in this area.');
+    await pick(dearId);
+    h = await histState();
+    assert.deepEqual(h.on, [stationEntry(e5, dearId).bin]);
+    assert.equal(h.b, 'No station in this area is more expensive.');
+    assert.match(h.a, /^You could save €\d+\.\d\d–€\d+\.\d\d more at a cheaper station\.$/);
+    ok('histogram: shown on selection, one bar per bin at the station share, exactly one highlighted bar; another selection moves the highlight without rebuilding');
+
+    await pick(midId);
+    for (const L of [5, 80, 100]) {
+      await ev(`(()=>{const r=document.getElementById('litres');r.value='${L}';r.dispatchEvent(new Event('input',{bubbles:true}))})()`);
+      h = await histState();
+      const v = savings(stationEntry(e5, midId), L);
+      assert.equal(h.litres, `${L} L`);
+      assert.equal(h.a, `You could save ${formatEuroRange(v.cheaper, 'en')} more at a cheaper station.`);
+      assert.equal(h.b, `You're already saving ${formatEuroRange(v.dearer, 'en')} compared with more expensive stations.`);
+      assert.ok(h.same && h.muts === 0, 'slider did not rebuild the histogram');
+    }
+    assert.equal(apiCalls.length, apiBefore, 'no price request for selections or the slider');
+    assert.equal(geoCalls, geoBefore);
+    assert.equal(await ev(`performance.getEntriesByType('resource').filter(r=>!/tile\\.openstreetmap\\.org/.test(r.name)).length`), 0, 'no other network activity');
+    ok('slider 5/80/100 L: both ranges follow L × price differences; no histogram rebuild; no API, geocoder or other requests');
+
+    // A dataset change (fuel) rebuilds once; the selection stays highlighted in the new histogram.
+    await click('.card[data-fuel=diesel]');
+    await sleep(50);
+    h = await histState();
+    const di = expectStats('diesel');
+    assert.equal(h.bars, di.counts.length);
+    assert.deepEqual(h.on, [stationEntry(di, midId).bin]);
+    assert.ok(!h.same, 'fuel change rebuilt the bars');
+    await ev(`window.__bars=[...document.querySelectorAll('#hist-bars .b')];window.__muts=0`);
+    await click('.card[data-fuel=e5]'); await sleep(50);
+    await click('.card[data-fuel=diesel]'); await sleep(50);
+    assert.equal(apiCalls.length, apiBefore);
+    ok('fuel change: histogram rebuilt for the new dataset, selection kept, still no request');
+    // A station without a price for the chosen fuel: no chart, no slider, a short explanation.
+    await click('.card[data-fuel=e10]'); await sleep(50);
+    await pick('00000000-0000-4000-8000-000000000007'); // open, no E10 price in the mock data
+    assert.deepEqual(await ev(`(()=>{const v=(id)=>!document.getElementById(id).hidden;return [v('hist'),v('hist-msg'),v('hist-plot'),v('litres-box'),v('save'),document.getElementById('hist-msg').textContent]})()`),
+      [true, true, false, false, false, 'No Super E10 price is available for this station.']);
+    await shot('hist-desktop-noprice');
+    await pick(midId);
+    await shot('hist-desktop-en');
+    ok('station without a price: calculator hidden, explanation shown');
+
+    // German page, mobile width.
+    await send('Emulation.setDeviceMetricsOverride', { width: 360, height: 780, deviceScaleFactor: 2, mobile: true });
+    await ev(`localStorage.setItem('lang','de')`);
+    await go(`${SITE}/de/`);
+    await waitFor(`document.querySelector('.card .p').textContent.includes(',')`, 'German prices');
+    await pick(midId);
+    h = await histState();
+    const de = savings(stationEntry(e5, midId), 40);
+    assert.equal(h.a, `An einer günstigeren Tankstelle könnten Sie zusätzlich ${formatEuroRange(de.cheaper, 'de')} sparen.`);
+    assert.equal(h.b, `Im Vergleich zu teureren Tankstellen sparen Sie hier bereits ${formatEuroRange(de.dearer, 'de')}.`);
+    assert.match(h.a, /\d,\d\d–\d+,\d\d €|\d,\d\d €/);
+    assert.match(h.label, /^Histogramm der Preise für Super E5/);
+    assert.equal(await ev(`document.querySelector('label[for=litres]').textContent`), 'Wie viel möchten Sie tanken?');
+    const m = await ev(`(()=>{const r=document.getElementById('hist').getBoundingClientRect();const lab=[...document.querySelectorAll('#hist-x span')].map(s=>s.getBoundingClientRect());
+      return {overflow:document.documentElement.scrollWidth-innerWidth,inside:lab.every(b=>b.left>=r.left-1&&b.right<=r.right+1),slider:Math.round(document.getElementById('litres').getBoundingClientRect().height),
+        afterMap:!!(document.querySelector('.mapwrap').compareDocumentPosition(document.getElementById('hist'))&4),beforeTable:!!(document.getElementById('hist').compareDocumentPosition(document.getElementById('more'))&4)}})()`);
+    assert.ok(m.overflow <= 0, `no horizontal overflow (${m.overflow}px)`);
+    assert.ok(m.inside, 'axis labels stay inside the component');
+    assert.ok(m.slider >= 40, 'slider touch target');
+    assert.ok(m.afterMap && m.beforeTable, 'between the map/detail area and the comparison table');
+    await shot('hist-mobile-de');
+    await send('Emulation.setDeviceMetricsOverride', { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false });
+    ok('DE + 360 px: German sentences with "0,00 €" amounts, German slider label and chart description; no overflow; placed between map and table');
+  }
 
   console.log(`ALL ${passed} E2E CHECKS PASSED (API requests: ${apiCalls.length}, geocoder requests: ${geoCalls})`);
   process.exitCode = 0;
