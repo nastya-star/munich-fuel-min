@@ -6,7 +6,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { renderArticlePage } from './article.mjs';
 
 const SITE = 'https://nastya-star.github.io/munich-fuel-min/';
-const RADII = [5, 10, 17]; // keep in sync with docs/core.js
+const RADII = [5, 10, 20]; // keep in sync with docs/core.js
+const DEFAULT_RADIUS = 20;
 
 const T = {
   en: {
@@ -44,7 +45,7 @@ const T = {
     howBtn: 'How does it work?',
     howPath: 'how-it-works.html',
     noscript: 'This page needs JavaScript to request current prices.',
-    howTitle: 'How it works',
+    howTitle: 'Price comparison at a glance',
     how: [
       'Prices for Super E5, Super E10 and Diesel are retrieved from Tankerkönig when you open the page, choose a starting point or click Refresh. For all visitors together, at most one new request is made per minute; in between, recent results are reused and labelled with their retrieval time. Moving or zooming the map and switching fuel never request new data.',
       'The cheapest price is the lowest price in €/L (to a tenth of a cent) among stations in the chosen radius that report a valid price and – unless you untick the filter – are reported as open. All stations with that price are shown and marked green with a check mark on the map. Every higher price is coloured from yellow (next cheapest) to red (most expensive) by its rank among the prices present; stations without a price for the fuel are grey. If the data for your area is incomplete, nothing is marked green.',
@@ -90,7 +91,7 @@ const T = {
     howBtn: 'Wie funktioniert es?',
     howPath: 'de/how-it-works.html',
     noscript: 'Diese Seite benötigt JavaScript, um aktuelle Preise abzufragen.',
-    howTitle: 'So funktioniert es',
+    howTitle: 'Preisvergleich kurz erklärt',
     how: [
       'Die Preise für Super E5, Super E10 und Diesel werden bei Tankerkönig abgefragt, wenn Sie die Seite öffnen, einen Startpunkt wählen oder auf Aktualisieren klicken. Für alle Besucher zusammen erfolgt höchstens eine neue Abfrage pro Minute; dazwischen werden aktuelle Ergebnisse wiederverwendet und mit ihrem Abrufzeitpunkt gekennzeichnet. Verschieben oder Zoomen der Karte und der Wechsel des Kraftstoffs lösen nie eine neue Abfrage aus.',
       'Der günstigste Preis ist der niedrigste Literpreis (auf den Zehntelcent genau) unter den Tankstellen im gewählten Umkreis, die einen gültigen Preis melden und – sofern der Filter aktiv ist – als geöffnet gemeldet sind. Alle Tankstellen mit diesem Preis werden angezeigt und auf der Karte grün mit Häkchen markiert. Jeder höhere Preis wird nach seinem Rang unter den vorhandenen Preisen von Gelb (nächstgünstiger) bis Rot (teuerster) eingefärbt; Tankstellen ohne Preis für den Kraftstoff sind grau. Sind die Daten für Ihr Gebiet unvollständig, wird nichts grün markiert.',
@@ -220,8 +221,12 @@ input::placeholder{color:#8f8b83}
 .linkbtn{background:none;border:0;padding:.3rem 0;color:var(--mute);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-size:.88rem;min-height:2.4rem}
 .linkbtn:hover{color:var(--fg)}
 /* comparison */
-/* Link to the article (same English article from both languages) */
+/* Link to the article: white primary button, same footprint as the 'Compare stations' accordion bar */
 .howto{margin:1.5rem 0 0}
+.howto .btn.article{display:flex;width:100%;min-height:calc(3rem + 2px);padding:.4rem .9rem;border:1px solid #fff;background:#fff;color:#000;font:400 1.15rem/1.25 var(--serif);white-space:normal;text-align:center}
+.howto .btn.article:hover{background:#e6e3dc;border-color:#e6e3dc}
+.howto .btn.article:active{background:#d6d2c8}
+.howto .btn.article:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
 details.more{margin-top:1.5rem;border:1px solid var(--soft);border-radius:var(--r)}
 details.more>summary{display:flex;justify-content:space-between;align-items:center;min-height:3rem;padding:.4rem .9rem;font:400 1.15rem var(--serif);cursor:pointer;list-style:none}
 details.more>summary::-webkit-details-marker{display:none}
@@ -316,7 +321,7 @@ ${CSS}
 <p id="loc-msg" class="msg" role="status" aria-live="polite"></p>
 <div class="opts">
 <button type="button" id="geo" class="btn small">${PIN}${t.geo}</button>
-<fieldset class="seg"><legend>${t.radius}</legend>${RADII.map((r) => `<label><input type="radio" name="radius" value="${r}"${r === 17 ? ' checked' : ''}><span>${r} km</span></label>`).join('')}</fieldset>
+<fieldset class="seg"><legend>${t.radius}</legend>${RADII.map((r) => `<label><input type="radio" name="radius" value="${r}"${r === DEFAULT_RADIUS ? ' checked' : ''}><span>${r} km</span></label>`).join('')}</fieldset>
 <label class="check"><input type="checkbox" id="open-only" checked> ${t.openOnly}</label>
 </div>
 </section>
@@ -355,7 +360,7 @@ ${['e5', 'e10', 'diesel'].map((f, i) => `<button type="button" class="card" data
 </div>
 </details>
 
-<p class="howto"><a class="btn" href="${SITE}${t.howPath}">${t.howBtn}</a></p>
+<p class="howto"><a class="btn article" href="${SITE}${t.howPath}">${t.howBtn}</a></p>
 
 <footer>
 <details><summary>${t.howTitle}</summary>${t.how.map((p) => `<p>${p}</p>`).join('')}</details>

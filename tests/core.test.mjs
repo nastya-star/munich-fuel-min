@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   DEFAULT_LOCATION, minimum, minima, eligible, byPrice, byDistance, filterList, formatMilli, formatKm, haversineKm, serverArea,
   responseCovers, localStations, directionsUrl, stationTitle, stationSubtitle, prettify, address, parseGeocode, requestPosition,
-  loadSaved, save, validPrice,
+  loadSaved, save, validPrice, RADII, DEFAULT_RADIUS,
 } from '../docs/core.js';
 import { snapArea } from '../worker/src/query.js';
 import { haversineKm as serverHaversine } from '../worker/src/geo.js';
@@ -163,7 +163,30 @@ test('saved location round-trips; corrupt or invalid storage is ignored', () => 
   assert.equal(loadSaved(null), null);
   const throwing = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } };
   assert.equal(loadSaved(throwing), null);
-  save(throwing, DEFAULT_LOCATION, 17); // must not throw
+  save(throwing, DEFAULT_LOCATION, 20); // must not throw
+});
+
+test('radius options are 5/10/20 km; a saved 17 km (former option) becomes 20 km, the location is kept', () => {
+  assert.deepEqual(RADII, [5, 10, 20]);
+  assert.equal(DEFAULT_RADIUS, 20);
+  const mem = new Map();
+  const storage = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
+  const location = { lat: 48.2, lng: 11.6, label: 'X', source: 'search' };
+  mem.set('fuel-location', JSON.stringify({ location, radius: 17 }));
+  assert.deepEqual(loadSaved(storage), { location, radius: 20 });
+  mem.set('fuel-location', JSON.stringify({ location, radius: 12 }));
+  assert.deepEqual(loadSaved(storage), { location, radius: 20 }, 'unknown radius -> default, location kept');
+  for (const r of [5, 10, 20]) { save(storage, location, r); assert.equal(loadSaved(storage).radius, r); }
+});
+
+test('20 km stays fully covered after snapping, well inside the 25 km API limit', () => {
+  for (let k = 0; k < 2000; k++) {
+    const origin = { lat: 47.9 + (k % 50) * 0.0107, lng: 11.2 + Math.floor(k / 50) * 0.0193 };
+    const q = serverArea(origin, 20);
+    assert.ok(q.rad >= 20 && q.rad <= 21, String(q.rad));
+    assert.equal(responseCovers({ coverage: 'full', query: q }, origin, 20), true);
+    assert.deepEqual(snapArea(origin.lat, origin.lng, 20), q, 'browser and Worker snap identically');
+  }
 });
 
 // list

@@ -3,7 +3,7 @@
 // grows beyond the data already loaded, and on Refresh. Never per keystroke, never on a timer.
 // Fuel, open-only, list search/sort/filter work on the data already loaded.
 import {
-  FUELS, RADII, DEFAULT_LOCATION, serverArea, responseCovers, localStations, minima, byPrice, byDistance, filterList,
+  FUELS, RADII, DEFAULT_RADIUS, DEFAULT_LOCATION, serverArea, responseCovers, localStations, minima, byPrice, byDistance, filterList,
   formatMilli, formatKm, formatTime, stationTitle, stationSubtitle, address, directionsUrl, parseGeocode, requestPosition,
   loadSaved, save, validLocation, priceColors, validPrice, priceGap, formatCents,
 } from './core.js';
@@ -194,7 +194,7 @@ const els = {
 const saved = loadSaved(storage);
 const state = {
   location: saved?.location ?? { ...DEFAULT_LOCATION },
-  radius: saved?.radius ?? 17,
+  radius: saved?.radius ?? DEFAULT_RADIUS,
   fuel: 'e5',
   response: null, // last successful response that covers (or partially covers) the current area
   error: null, // {code, retry}
@@ -692,7 +692,7 @@ function selectStation(id, { pan = false } = {}) {
 // ---- start ----------------------------------------------------------------------------------------
 
 els.input.value = locationLabel(state.location);
-if (!RADII.includes(state.radius)) state.radius = 17;
+if (!RADII.includes(state.radius)) state.radius = DEFAULT_RADIUS;
 els.radios.forEach((r) => (r.checked = Number(r.value) === state.radius));
 render();
 load();

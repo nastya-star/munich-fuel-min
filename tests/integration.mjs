@@ -21,7 +21,7 @@ const mock = createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   seenKeys.add(u.searchParams.get('apikey'));
   assert.equal(u.searchParams.get('type'), 'all');
-  assert.equal(u.searchParams.get('rad'), '17.5');
+  assert.equal(u.searchParams.get('rad'), '20.5');
   await sleep(400); // slow upstream widens the window for duplicate requests
   res.setHeader('Content-Type', 'application/json');
   if (mode === 'fail') return res.end(JSON.stringify({ ok: false, message: `Key ${TEST_KEY} existiert nicht oder ist deaktiviert` }));
