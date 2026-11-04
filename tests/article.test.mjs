@@ -3,23 +3,26 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { renderArticlePage, INLINE_MATH, LATEX_MATH, DISPLAY_SOURCE, DISPLAY_SOURCE_DE } from '../article.mjs';
+import { renderArticlePage, INLINE_MATH, LATEX_MATH, DISPLAY_SOURCE } from '../article.mjs';
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
-// SHA-256 of the author's final approved files ("Pasted markdown(9).md" and
-// "Munich_Fuel_How_It_Works_DE_Updated.md"). If the author changes an article intentionally,
-// update its value together with the new file.
+// SHA-256 of the approved article files: the author's texts ("Pasted markdown(9).md",
+// "Munich_Fuel_How_It_Works_DE_Updated.md") with the requested 02.2 objective rewrite
+// (min sum p_i z_i, sum z_i = 1) and the 5/10/20 km option sentence. If an article changes
+// intentionally, update its value together with the new file.
 const ARTICLES = {
   en: {
-    md: '../content/how-it-works.md', page: '../docs/how-it-works.html', sha: '5b09e5a75076f9b9204ad8e50a6703c86051de3685f80b5a7028fec44c0b3d83',
-    display: DISPLAY_SOURCE, mathRe: /\(((?:[^()]|\([^()]*\))*)\)/g, table: INLINE_MATH, inline: 19,
+    md: '../content/how-it-works.md', page: '../docs/how-it-works.html', sha: '31871552b0a000704c1016ab7a7540330b1c2167fa4f3f87214918a935f8d368',
+    display: DISPLAY_SOURCE, mathRe: /\(((?:[^()]|\([^()]*\))*)\)/g, table: INLINE_MATH, inline: 24,
+    other: 'https://nastya-star.github.io/munich-fuel-min/de/how-it-works.html', options: 'select a radius of 5, 10 or 20 kilometers',
     start: 'How does it work? A transparent fuel-price comparison system for Munich', end: 'Yours, admiringly, Anastasiia P.S. Made with love.',
     title: 'How does it work? · Munich Fuel Minimum', canonical: 'https://nastya-star.github.io/munich-fuel-min/how-it-works.html',
     nav: [['https://nastya-star.github.io/anastasiia-stepanenko/', '← Back to my website'], ['https://nastya-star.github.io/munich-fuel-min/', '← Back to fuel minimisation']],
   },
   de: {
-    md: '../content/how-it-works.de.md', page: '../docs/de/how-it-works.html', sha: '2457901ace660bb8c094aa928a17f00ef6715e4f405c194112a21a79c93f9e28',
-    display: DISPLAY_SOURCE_DE, mathRe: /\\\((.+?)\\\)/g, table: LATEX_MATH, inline: 19,
+    md: '../content/how-it-works.de.md', page: '../docs/de/how-it-works.html', sha: 'fb59b68effb89f6c4636ff31d2d3b093b1e7a712eccf47d1ca177c0d3edf71e5',
+    display: DISPLAY_SOURCE, mathRe: /\\\((.+?)\\\)/g, table: LATEX_MATH, inline: 24,
+    other: 'https://nastya-star.github.io/munich-fuel-min/how-it-works.html', options: 'einen Radius von 5, 10 oder 20 Kilometern',
     start: 'Wie funktioniert es? 01 Einleitung Hallo, wir kennen uns ja schon.', end: 'Mit bewundernden Grüßen, Anastasiia P.S. Mit Liebe gemacht.',
     title: 'Wie funktioniert es? · Munich Fuel Minimum', canonical: 'https://nastya-star.github.io/munich-fuel-min/de/how-it-works.html',
     nav: [['https://nastya-star.github.io/anastasiia-stepanenko/de/', '← Zurück zur Hauptwebsite'], ['https://nastya-star.github.io/munich-fuel-min/de/', '← Zurück zu Munich Fuel Minimum']],
@@ -82,15 +85,41 @@ for (const [lang, a] of Object.entries(ARTICLES)) {
     assert.equal([...HTML.matchAll(/<math display="block"/g)].length, 1, 'one display equation');
     assert.equal([...HTML.matchAll(/<math data-tex="/g)].length, a.inline, 'all inline expressions');
     const visible = HTML.replace(/<math[\s\S]*?<\/math>/g, '').replace(/<[^>]+>/g, '');
-    assert.doesNotMatch(visible, /\\(min|in|operatorname|widehat|tau|boxed)|\\_|\\\*|\\\(|\\\[|S_f|p_f|t_i/);
+    assert.doesNotMatch(visible, /\\(min|in|operatorname|widehat|tau|boxed|sum)|\\_|\\\*|\\\(|\\\[|\\\{|S_f|p_f|t_i|p_i|z_i|z_\d/);
     for (const tex of Object.keys(a.table)) assert.ok(lang === 'en' ? MD.includes(`(${tex})`) : MD.includes(`\\(${tex}\\)`), `table entry used: ${tex}`);
   });
 
-  test(`${lang}: the objective is centred and boxed: p_f^*(x,r,t) = min over S_f(x,r,t) of p_{i,f}(t_i)`, () => {
+  test(`${lang}: the only centred equation is the boxed objective min sum_{i in S} p_i z_i`, () => {
+    assert.equal([...HTML.matchAll(/class="eq"/g)].length, 1);
     const m = /<div class="eq"><span class="box"><math display="block" data-tex="DISPLAY">([\s\S]*?)<\/math><\/span><\/div>/.exec(HTML);
     assert.ok(m);
-    assert.match(m[1], /^<msubsup><mi>p<\/mi><mi>f<\/mi><mo>\*<\/mo><\/msubsup>/);
-    assert.match(m[1], /<mo>=<\/mo><munder><mo movablelimits="false">min<\/mo><mrow><mi>i<\/mi><mo>∈<\/mo>/);
+    assert.equal(m[1], '<mi>min</mi><mspace width="0.1667em"/><munder><mo movablelimits="false">∑</mo><mrow><mi>i</mi><mo>∈</mo><mi>S</mi></mrow></munder>'
+      + '<msub><mi>p</mi><mrow><mi>i</mi></mrow></msub><msub><mi>z</mi><mrow><mi>i</mi></mrow></msub>');
+  });
+
+  test(`${lang}: symbols and the selection constraint sum z_i = 1 are inline, in section 02.2`, () => {
+    const s2 = HTML.slice(HTML.indexOf('<span>02.2</span>'), HTML.indexOf('<span>03</span>'));
+    for (const tex of ['S', 'p_i', 'z_i\\in\\{0,1\\}', '\\sum_{i\\in S}z_i=1', 'z_2=1', 'z_3=1']) assert.ok(s2.includes(`<math data-tex="${tex}">`), tex);
+    assert.match(s2, /<math data-tex="\\sum_\{i\\in S\}z_i=1"><msub><mo>∑<\/mo><mrow><mi>i<\/mi><mo>∈<\/mo><mi>S<\/mi><\/mrow><\/msub><msub><mi>z<\/mi><mrow><mi>i<\/mi><\/mrow><\/msub><mo>=<\/mo><mn>1<\/mn><\/math>/);
+    assert.match(s2, /1,729 €|€1\.729/, 'numerical example preserved');
+    assert.ok(MD.includes(a.options), '5/10/20 km option sentence');
+    assert.doesNotMatch(MD, /5, 10 (or|oder) 17/);
+  });
+
+  test(`${lang}: the closing block is left-aligned (no centring)`, () => {
+    assert.match(HTML, /<div class="closing">/);
+    assert.doesNotMatch(HTML, /\.closing\{[^}]*text-align:center/);
+    assert.doesNotMatch(HTML, /\.(closing|sign)[^{]*\{[^}]*(text-align|margin:0 auto)/);
+  });
+
+  test(`${lang}: EN | DE switch at the top right links to the other article version`, () => {
+    const top = /<div class="top">(<nav class="nav"[\s\S]*?<\/nav>)(<nav class="lang"[\s\S]*?<\/nav>)<\/div>/.exec(HTML);
+    assert.ok(top, 'back links first (left), language switch second (right)');
+    const other = lang === 'en' ? 'de' : 'en';
+    assert.ok(top[2].includes(`<span aria-current="page" lang="${lang}">`), 'active language highlighted');
+    assert.ok(top[2].includes(`<a href="${a.other}" hreflang="${other}" lang="${other}" data-lang="${other}">`), 'links the equivalent page');
+    assert.match(HTML, /localStorage\.setItem\("lang"/, 'stores the language preference like the home page');
+    assert.match(HTML, /\.top\{display:flex;justify-content:space-between/);
   });
 
   test(`${lang}: back navigation top and bottom, title, canonical, language`, () => {
@@ -115,8 +144,23 @@ test('both homepages link to the article in their language, after the list and b
     ['../docs/de/index.html', 'https://nastya-star.github.io/munich-fuel-min/de/how-it-works.html', 'Wie funktioniert es?'],
   ]) {
     const page = read(file);
-    assert.ok(page.includes(`<p class="howto"><a class="btn" href="${href}">${label}</a></p>`), file);
+    assert.ok(page.includes(`<p class="howto"><a class="btn article" href="${href}">${label}</a></p>`), file);
     assert.ok(page.indexOf('class="howto"') > page.indexOf('id="more"') && page.indexOf('class="howto"') < page.indexOf('<footer>'), file);
+    assert.match(page, /\.howto \.btn\.article\{display:flex;width:100%;min-height:calc\(3rem \+ 2px\);padding:\.4rem \.9rem;border:1px solid #fff;background:#fff;color:#000;font:400 1\.15rem/);
+    assert.match(page, /\.howto \.btn\.article:focus-visible\{outline:/);
+  }
+});
+
+test('homepage accordion headings are distinct from the article title; radius options 5/10/20, 20 checked', () => {
+  for (const [file, title, old] of [
+    ['../docs/index.html', 'Price comparison at a glance', 'How it works'],
+    ['../docs/de/index.html', 'Preisvergleich kurz erklärt', 'So funktioniert es'],
+  ]) {
+    const page = read(file);
+    assert.ok(page.includes(`<details><summary>${title}</summary>`), file);
+    assert.ok(!page.includes(`<summary>${old}</summary>`), file);
+    const radii = [...page.matchAll(/<input type="radio" name="radius" value="(\d+)"( checked)?>/g)].map((m) => m[1] + (m[2] ? '*' : ''));
+    assert.deepEqual(radii, ['5', '10', '20*'], file);
   }
 });
 

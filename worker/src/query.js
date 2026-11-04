@@ -8,7 +8,7 @@
 import { haversineKm, round2 } from './geo.js';
 
 // Marienplatz, München: the default search centre.
-export const DEFAULT_AREA = Object.freeze({ lat: 48.1374, lng: 11.5755, rad: 17 });
+export const DEFAULT_AREA = Object.freeze({ lat: 48.1374, lng: 11.5755, rad: 20 });
 export const MAX_RADIUS_KM = 25; // Tankerkönig list.php maximum
 export const MIN_RADIUS_KM = 1;
 // Tankerkönig covers Germany only; a generous bounding box.
@@ -43,7 +43,7 @@ export function parseArea(sp) {
   for (const [k, v] of sp) if (!ALLOWED_PARAMS.has(k) || v.length > MAX_PARAM_LENGTH) return { ok: false, error: 'invalid_area' };
   if ([...sp.keys()].length !== new Set(sp.keys()).size) return { ok: false, error: 'invalid_area' };
   // No parameters: the default area, snapped exactly as the page snaps it, so requests with and
-  // without parameters share one cache entry (48.14, 11.58, 17.5 km contains Marienplatz + 17 km).
+  // without parameters share one cache entry (48.14, 11.58, 20.5 km contains Marienplatz + 20 km).
   if (!sp.has('lat') && !sp.has('lng') && !sp.has('rad')) {
     const area = snapArea(DEFAULT_AREA.lat, DEFAULT_AREA.lng, DEFAULT_AREA.rad);
     return { ok: true, area, request: requestCoverage(DEFAULT_AREA.lat, DEFAULT_AREA.lng, DEFAULT_AREA.rad, area) };

@@ -25,7 +25,7 @@ docs/app.js, core.js                     └─ PriceGate Durable Object (one, g
   - search for an address, place or postcode (Nominatim, on submit only, at most once per second; typing only filters places they used before);
   - or click *Use my location*. The browser asks for permission only then; if it is denied, the starting point stays as it was.
 
-  The choice and the radius (5/10/17 km) are kept in `localStorage`, so they survive the DE/EN switch.
+  The choice and the radius (5/10/20 km, default 20; a saved 17 km is migrated to 20 km) are kept in `localStorage`, so they survive the DE/EN switch.
 - **When prices are requested.** On opening the page, when a starting point is confirmed, when a larger radius needs more data, and on *Refresh*. Never per keystroke, never on a timer. Fuel cards, the open-only filter, a smaller radius, and list search/sort/filter all reuse the data already loaded.
 - **Privacy.** Before anything leaves the browser, the starting point is snapped to a 0.01° grid (about 1 km), and the radius is enlarged so the circle still contains the visitor’s own. The Worker snaps again for any client, so it never sees or stores a precise location. Exact distances and the Google Maps origin are computed in the browser from the precise point.
 - **Area-aware cache with one global limit.** All requests go through one Durable Object (`idFromName("global")`) and are evaluated one after another, so there are no races:
@@ -73,7 +73,7 @@ There is no light mode. Amber and red appear only for warnings and errors; green
 
 ### API
 
-`GET /api/prices?lat=48.14&lng=11.58&rad=17.5`. Without parameters, the default area is used (Marienplatz, 17 km).
+`GET /api/prices?lat=48.14&lng=11.58&rad=20.5`. Without parameters, the default area is used (Marienplatz, 20 km).
 
 | Field | Meaning |
 | --- | --- |

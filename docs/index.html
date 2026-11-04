@@ -131,8 +131,12 @@ input::placeholder{color:#8f8b83}
 .linkbtn{background:none;border:0;padding:.3rem 0;color:var(--mute);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-size:.88rem;min-height:2.4rem}
 .linkbtn:hover{color:var(--fg)}
 /* comparison */
-/* Link to the article (same English article from both languages) */
+/* Link to the article: white primary button, same footprint as the 'Compare stations' accordion bar */
 .howto{margin:1.5rem 0 0}
+.howto .btn.article{display:flex;width:100%;min-height:calc(3rem + 2px);padding:.4rem .9rem;border:1px solid #fff;background:#fff;color:#000;font:400 1.15rem/1.25 var(--serif);white-space:normal;text-align:center}
+.howto .btn.article:hover{background:#e6e3dc;border-color:#e6e3dc}
+.howto .btn.article:active{background:#d6d2c8}
+.howto .btn.article:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
 details.more{margin-top:1.5rem;border:1px solid var(--soft);border-radius:var(--r)}
 details.more>summary{display:flex;justify-content:space-between;align-items:center;min-height:3rem;padding:.4rem .9rem;font:400 1.15rem var(--serif);cursor:pointer;list-style:none}
 details.more>summary::-webkit-details-marker{display:none}
@@ -194,7 +198,7 @@ footer details summary{cursor:pointer;color:var(--fg);min-height:2.4rem;display:
 <p id="loc-msg" class="msg" role="status" aria-live="polite"></p>
 <div class="opts">
 <button type="button" id="geo" class="btn small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></svg>Use my location</button>
-<fieldset class="seg"><legend>Radius</legend><label><input type="radio" name="radius" value="5"><span>5 km</span></label><label><input type="radio" name="radius" value="10"><span>10 km</span></label><label><input type="radio" name="radius" value="17" checked><span>17 km</span></label></fieldset>
+<fieldset class="seg"><legend>Radius</legend><label><input type="radio" name="radius" value="5"><span>5 km</span></label><label><input type="radio" name="radius" value="10"><span>10 km</span></label><label><input type="radio" name="radius" value="20" checked><span>20 km</span></label></fieldset>
 <label class="check"><input type="checkbox" id="open-only" checked> Open stations only</label>
 </div>
 </section>
@@ -235,10 +239,10 @@ footer details summary{cursor:pointer;color:var(--fg);min-height:2.4rem;display:
 </div>
 </details>
 
-<p class="howto"><a class="btn" href="https://nastya-star.github.io/munich-fuel-min/how-it-works.html">How does it work?</a></p>
+<p class="howto"><a class="btn article" href="https://nastya-star.github.io/munich-fuel-min/how-it-works.html">How does it work?</a></p>
 
 <footer>
-<details><summary>How it works</summary><p>Prices for Super E5, Super E10 and Diesel are retrieved from Tankerkönig when you open the page, choose a starting point or click Refresh. For all visitors together, at most one new request is made per minute; in between, recent results are reused and labelled with their retrieval time. Moving or zooming the map and switching fuel never request new data.</p><p>The cheapest price is the lowest price in €/L (to a tenth of a cent) among stations in the chosen radius that report a valid price and – unless you untick the filter – are reported as open. All stations with that price are shown and marked green with a check mark on the map. Every higher price is coloured from yellow (next cheapest) to red (most expensive) by its rank among the prices present; stations without a price for the fuel are grey. If the data for your area is incomplete, nothing is marked green.</p><p>Distances are straight-line distances from your starting point, not driving distances. Directions opens Google Maps from your starting point to the station.</p><p>Your starting point is used in your browser only. The server receives it rounded to about 1 km and does not store your exact location.</p></details>
+<details><summary>Price comparison at a glance</summary><p>Prices for Super E5, Super E10 and Diesel are retrieved from Tankerkönig when you open the page, choose a starting point or click Refresh. For all visitors together, at most one new request is made per minute; in between, recent results are reused and labelled with their retrieval time. Moving or zooming the map and switching fuel never request new data.</p><p>The cheapest price is the lowest price in €/L (to a tenth of a cent) among stations in the chosen radius that report a valid price and – unless you untick the filter – are reported as open. All stations with that price are shown and marked green with a check mark on the map. Every higher price is coloured from yellow (next cheapest) to red (most expensive) by its rank among the prices present; stations without a price for the fuel are grey. If the data for your area is incomplete, nothing is marked green.</p><p>Distances are straight-line distances from your starting point, not driving distances. Directions opens Google Maps from your starting point to the station.</p><p>Your starting point is used in your browser only. The server receives it rounded to about 1 km and does not store your exact location.</p></details>
 <p>Price data: <a href="https://www.tankerkoenig.de/" rel="noopener">Tankerkönig</a> (<a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">CC BY 4.0</a>), based on reports to the Markttransparenzstelle für Kraftstoffe (MTS-K) of the Bundeskartellamt. Map and address search: © <a href="https://www.openstreetmap.org/copyright" rel="noopener">OpenStreetMap</a> contributors (tiles darkened for display), <a href="https://nominatim.openstreetmap.org/" rel="noopener">Nominatim</a>, <a href="https://leafletjs.com/" rel="noopener">Leaflet</a>.</p>
 <p>No guarantee that prices are current or correct; the price at the pump applies. Source code on <a href="https://github.com/nastya-star/munich-fuel-min" rel="noopener">GitHub</a>.</p>
 </footer>

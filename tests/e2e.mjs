@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join, extname, normalize } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import assert from 'node:assert/strict';
-import { haversineKm } from '../docs/core.js';
+import { haversineKm, serverArea } from '../docs/core.js';
 
 const CHROME = process.env.CHROME_PATH || ['C:/Program Files/Google/Chrome/Application/chrome.exe', '/usr/bin/google-chrome', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].find(existsSync);
 if (!CHROME) { console.log('SKIP: Chrome not found (set CHROME_PATH)'); process.exit(0); }
@@ -103,13 +103,13 @@ try {
   await go(`${SITE}/`);
   await waitFor(`document.querySelector('.card .p').textContent.includes('.')`, 'prices');
   assert.equal(await ev(`document.getElementById('loc-input').value`), 'Marienplatz, München');
-  assert.equal(apiCalls.at(-1), '?lat=48.14&lng=11.58&rad=17.5', 'default area sent snapped');
+  assert.equal(apiCalls.at(-1), '?lat=48.14&lng=11.58&rad=20.5', 'default area sent snapped');
   assert.equal(apiCalls.length, 1, 'one API request on open');
   ok('default starting point Marienplatz, one request with snapped area');
 
   // 8. minima + null bug + ties + closed --------------------------------------------------------------
   const cards = await ev(`[...document.querySelectorAll('.card')].map(c=>c.querySelector('.p').textContent)`);
-  const minOf = (f) => Math.min(...STATIONS.filter((s) => s.isOpen && s.prices[f] && haversineKm({ lat: 48.1374, lng: 11.5755 }, s) <= 17).map((s) => s.prices[f]));
+  const minOf = (f) => Math.min(...STATIONS.filter((s) => s.isOpen && s.prices[f] && haversineKm({ lat: 48.1374, lng: 11.5755 }, s) <= 20).map((s) => s.prices[f]));
   assert.deepEqual(cards, ['e5', 'e10', 'diesel'].map((f) => `${(minOf(f) / 1000).toFixed(3)} €/L`));
   assert.equal(await ev(`/\\bnull\\b|undefined|NaN/.test(document.body.innerText)`), false, 'no literal null/undefined/NaN on the page');
   const bestCount = await ev(`document.querySelectorAll('#best .stns li').length`);
@@ -135,7 +135,7 @@ try {
 
   // Map: markers, colours, no extra requests ----------------------------------------------------------------
   await waitFor(`document.querySelectorAll('.leaflet-marker-icon[data-id]').length>0`, 'map markers');
-  const visibleIds = STATIONS.filter((s) => s.isOpen && haversineKm({ lat: 48.1374, lng: 11.5755 }, s) <= 17).map((s) => s.id).sort();
+  const visibleIds = STATIONS.filter((s) => s.isOpen && haversineKm({ lat: 48.1374, lng: 11.5755 }, s) <= 20).map((s) => s.id).sort();
   const markers = async () => ev(`[...document.querySelectorAll('.leaflet-marker-icon[data-id]')].map(m=>({id:m.dataset.id,tier:m.dataset.tier,color:m.dataset.color}))`);
   let mk = await markers();
   assert.deepEqual(mk.map((m) => m.id).sort(), visibleIds, 'one marker per open station in the radius (open-only on)');
@@ -195,7 +195,7 @@ try {
   assert.match(pop, /Price retrieved/);
   assert.equal(await text('#best-h'), 'Selected station');
   // Selected-station panel: fuel, price, gap in ct/L (thousandths / 10), address once, buttons.
-  const minE5 = Math.min(...STATIONS.filter((s) => s.isOpen && haversineKm({ lat: 48.1374, lng: 11.5755 }, s) <= 17 && s.prices.e5).map((s) => s.prices.e5));
+  const minE5 = Math.min(...STATIONS.filter((s) => s.isOpen && haversineKm({ lat: 48.1374, lng: 11.5755 }, s) <= 20 && s.prices.e5).map((s) => s.prices.e5));
   const panel = await ev(`({fuel:document.querySelector('#best .fuel').textContent,price:document.querySelector('#best .price').textContent,gap:document.querySelector('#best .gap').textContent,
     addrCount:[...document.querySelectorAll('#best .meta')].filter(m=>m.textContent.includes('Teststraße')).length,
     route:document.querySelector('#best .acts a.btn.solid').textContent,cheap:(()=>{const b=document.getElementById('show-cheapest');return {tag:b.tagName,cls:b.className,visible:!!b.offsetParent,h:Math.round(b.getBoundingClientRect().height),text:b.textContent}})(),
@@ -350,7 +350,7 @@ try {
   ok('partial coverage labelled "Incomplete", outdated, refresh countdown; refresh disabled; no green markers; selection says "lowest observed"');
 
   mode = 'ratelimit';
-  await click('input[name=radius][value="17"]'); // larger radius → needs a new request
+  await click('input[name=radius][value="20"]'); // larger radius → needs a new request
   await waitFor(`/requested again in \\d+ s/.test(document.getElementById('note').textContent)`, 'rate limit note');
   assert.equal(await ev(`document.querySelectorAll('#best .stns li').length`), 0, 'no prices for an uncovered area');
   assert.deepEqual(await ev(`[...document.querySelectorAll('.card .p')].map(p=>p.textContent)`), ['–', '–', '–']);
@@ -362,7 +362,7 @@ try {
   await sleep(400);
   await waitFor(`document.documentElement.lang==='de' && document.querySelector('.card .p').textContent.includes(',')`, 'German page with prices');
   assert.equal(await ev(`document.getElementById('loc-input').value`), 'Mein Standort');
-  assert.equal(await ev(`document.querySelector('input[name=radius]:checked').value`), '17');
+  assert.equal(await ev(`document.querySelector('input[name=radius]:checked').value`), '20');
   assert.match(await text('#status'), /Aktualisiert/);
   assert.match(await text('#best a'), /Route planen/);
   assert.match(await text('.card .h'), /niedrigster Preis/);
@@ -399,6 +399,63 @@ try {
   await sleep(process.env.REAL_TILES ? 2500 : 0);
   await shot('mobile-en');
   ok('mobile 360 px: no horizontal overflow, touch targets ≥ 40 px');
+
+  // 12. Article pages and the homepage article button --------------------------------------------------
+  for (const [w, h, mobile] of [[1100, 900, false], [360, 780, true]]) {
+    await send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile });
+    for (const [path, lang, other, otherHref] of [
+      ['/how-it-works.html', 'en', 'de', 'https://nastya-star.github.io/munich-fuel-min/de/how-it-works.html'],
+      ['/de/how-it-works.html', 'de', 'en', 'https://nastya-star.github.io/munich-fuel-min/how-it-works.html'],
+    ]) {
+      await go(`${SITE}${path}`);
+      const a = await ev(`(()=>{const R=(e)=>e.getBoundingClientRect();const nav=document.querySelector('.top .nav'),sw=document.querySelector('.top .lang'),main=document.querySelector('main');
+        const eq=document.querySelectorAll('.eq');const m=document.querySelector('.eq math');const cl=[...document.querySelectorAll('.closing p')];
+        return {eqCount:eq.length,eqW:Math.round(R(m).width),eqH:Math.round(R(m).height),eqCentered:Math.abs((R(m).left+R(m).right)/2-(R(eq[0]).left+R(eq[0]).right)/2)<2,
+          mathOk:[...document.querySelectorAll('math')].every(x=>R(x).width>0&&R(x).height>0),
+          navLeft:Math.round(R(nav).left-R(main).left),swRight:Math.round(R(main).right-R(sw).right),swTop:Math.round(R(sw).top-R(nav).top),
+          active:sw.querySelector('[aria-current]').textContent,href:sw.querySelector('a').href,
+          closingAlign:cl.map(p=>getComputedStyle(p).textAlign),closingLeft:cl.map(p=>Math.round(R(p).left-R(document.querySelector('article')).left)),
+          backLinks:[...document.querySelectorAll('nav.nav a')].map(x=>x.href),overflow:document.documentElement.scrollWidth-innerWidth}})()`);
+      assert.equal(a.eqCount, 1, 'one centred equation');
+      assert.ok(a.mathOk && a.eqCentered && a.eqH < 90 && a.eqW > 60, JSON.stringify(a));
+      assert.ok(a.navLeft <= 20 && a.swRight <= 20 && a.swTop <= 4, `back links top-left, EN|DE top-right ${JSON.stringify(a)}`);
+      assert.match(a.active, new RegExp(lang.toUpperCase() + '$'));
+      assert.equal(a.href, otherHref);
+      assert.ok(a.closingAlign.length >= 3 && a.closingAlign.every((x) => x === 'start' || x === 'left'), a.closingAlign.join());
+      assert.ok(a.closingLeft.every((x) => x === a.closingLeft[0] && x <= 24), 'closing lines share the article column: ' + a.closingLeft.join());
+      assert.equal(a.backLinks.length, 4);
+      assert.ok(a.overflow <= 0, `no horizontal overflow (${a.overflow}px)`);
+      // the switch stores the preference (navigation to the live site is cancelled in the test)
+      assert.equal(await ev(`(()=>{localStorage.removeItem('lang');const l=document.querySelector('.top .lang a');l.addEventListener('click',(e)=>e.preventDefault());l.click();return localStorage.getItem('lang')})()`), other);
+    }
+    ok(`articles (${w}px): one centred boxed objective, EN|DE top-right linking the other version, back links top-left and bottom, closing left-aligned`);
+  }
+  await send('Emulation.setDeviceMetricsOverride', { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false });
+  for (const [path, lang, label, heading] of [['/', 'en', 'How does it work?', 'Price comparison at a glance'], ['/de/', 'de', 'Wie funktioniert es?', 'Preisvergleich kurz erklärt']]) {
+    await go(`${SITE}${path}`);
+    await ev(`localStorage.setItem('lang','${lang}')`);
+    await go(`${SITE}${path}`);
+    const b = await ev(`(()=>{const d=document.getElementById('more');d.open=false;const a=document.querySelector('.howto a'),cs=getComputedStyle(a),r=a.getBoundingClientRect(),m=d.getBoundingClientRect(),s=getComputedStyle(d.querySelector('summary'));
+      return {text:a.textContent,w:Math.round(r.width),h:Math.round(r.height),mw:Math.round(m.width),mh:Math.round(m.height),bg:cs.backgroundColor,fg:cs.color,font:cs.fontSize+' '+cs.fontFamily.split(',')[0],sfont:s.fontSize+' '+s.fontFamily.split(',')[0],
+        radius:cs.borderTopLeftRadius,mradius:getComputedStyle(d).borderTopLeftRadius,before:!!(a.compareDocumentPosition(document.querySelector('footer'))&4),
+        summaries:[...document.querySelectorAll('footer details>summary')].map(x=>x.textContent)}})()`);
+    assert.equal(b.text, label);
+    assert.equal(b.bg, 'rgb(255, 255, 255)'); assert.equal(b.fg, 'rgb(0, 0, 0)');
+    assert.ok(Math.abs(b.w - b.mw) <= 1 && Math.abs(b.h - b.mh) <= 1, `button ${b.w}x${b.h} vs Compare stations ${b.mw}x${b.mh}`);
+    assert.equal(b.font, b.sfont); assert.equal(b.radius, b.mradius); assert.ok(b.before);
+    assert.ok(b.summaries.includes(heading), b.summaries.join(' | '));
+  }
+  ok('homepage article button: white, black text, same size, radius and type as "Compare stations"; accordion renamed');
+  // A preference saved with the former 17 km option becomes 20 km and keeps the location.
+  await go(`${SITE}/`);
+  await ev(`localStorage.setItem('lang','en'); localStorage.setItem('fuel-location', JSON.stringify({location:{lat:48.1554264,lng:11.5634866,label:'Görresstraße 29',source:'search'},radius:17}))`);
+  await go(`${SITE}/`);
+  await waitFor(`document.querySelector('input[name=radius]:checked')`, 'radius');
+  assert.deepEqual(await ev(`[...document.querySelectorAll('input[name=radius]')].map(r=>r.value+(r.checked?'*':''))`), ['5', '10', '20*']);
+  assert.equal(await ev(`document.getElementById('loc-input').value`), 'Görresstraße 29');
+  await waitFor(`document.querySelector('.card .p').textContent.includes('.')`, 'prices after migration');
+  assert.equal(new URLSearchParams(apiCalls.at(-1)).get('rad'), String(serverArea({ lat: 48.1554264, lng: 11.5634866 }, 20).rad));
+  ok('saved 17 km preference migrated to 20 km, location kept, 20 km area requested');
 
   console.log(`ALL ${passed} E2E CHECKS PASSED (API requests: ${apiCalls.length}, geocoder requests: ${geoCalls})`);
   process.exitCode = 0;

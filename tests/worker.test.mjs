@@ -48,10 +48,10 @@ const sp = (o) => new URLSearchParams(o);
 
 test('no parameters -> default area snapped like the page does (shared cache entry)', () => {
   const r = parseArea(sp({}));
-  assert.deepEqual(r.area, { lat: 48.14, lng: 11.58, rad: 17.5 });
-  assert.deepEqual(r.request, { radiusKm: 17, coveredRadiusKm: 17, complete: true });
-  assert.deepEqual(r, parseArea(sp({ lat: '48.1374', lng: '11.5755', rad: '17' })));
-  assert.ok(covers(r.area, DEFAULT_AREA), 'still contains Marienplatz + 17 km');
+  assert.deepEqual(r.area, { lat: 48.14, lng: 11.58, rad: 20.5 });
+  assert.deepEqual(r.request, { radiusKm: 20, coveredRadiusKm: 20, complete: true });
+  assert.deepEqual(r, parseArea(sp({ lat: '48.1374', lng: '11.5755', rad: '20' })));
+  assert.ok(covers(r.area, DEFAULT_AREA), 'still contains Marienplatz + 20 km');
 });
 
 test('coordinates are snapped to 0.01 deg and the radius enlarged so the request stays covered', () => {

@@ -17,17 +17,20 @@ const mi = (x) => `<mi>${x}</mi>`;
 const mo = (x) => `<mo>${x}</mo>`;
 const paren = (inner) => `<mo stretchy="false">(</mo>${inner}<mo stretchy="false">)</mo>`;
 const sub = (base, s) => `<msub>${base}<mrow>${s}</mrow></msub>`;
-const args = (...xs) => xs.map(mi).join(mo(','));
 const if_ = `${mi('i')}${mo(',')}${mi('f')}`;
-const P_IF = sub(mi('p'), if_); // p_{i,f}
 const T_I = sub(mi('t'), mi('i')); // t_i
-const S_F = `${sub(mi('S'), mi('f'))}${paren(args('x', 'r', 't'))}`; // S_f(x,r,t)
-const P_STAR = `<msubsup>${mi('p')}${mi('f')}<mo>*</mo></msubsup>${paren(args('x', 'r', 't'))}`; // p_f^*(x,r,t)
+const mn = (x) => `<mn>${x}</mn>`;
+const P_I = sub(mi('p'), mi('i')); // p_i
+const Z_I = sub(mi('z'), mi('i')); // z_i
+const I_IN_S = `${mi('i')}${mo('∈')}${mi('S')}`;
 const M = {
   i: mi('i'), f: mi('f'), x: mi('x'), r: mi('r'), t: mi('t'), n: mi('n'), tau: mi('τ'), ti: T_I,
-  pif: `${P_IF}${paren(T_I)}`,
-  sf: S_F,
-  pstar: P_STAR,
+  S: mi('S'), pi: P_I,
+  zbin: `${Z_I}${mo('∈')}<mo stretchy="false">{</mo>${mn(0)}${mo(',')}${mn(1)}<mo stretchy="false">}</mo>`,
+  // inline: limits as a subscript, as LaTeX does in text style
+  pick: `<msub><mo>∑</mo><mrow>${I_IN_S}</mrow></msub>${Z_I}${mo('=')}${mn(1)}`,
+  z2: `${sub(mi('z'), mn(2))}${mo('=')}${mn(1)}`,
+  z3: `${sub(mi('z'), mn(3))}${mo('=')}${mn(1)}`,
   argmin: `<mi mathvariant="normal">arg</mi><mspace width="0.1667em"/><mi mathvariant="normal">min</mi>`,
   on: `${mi('O')}${paren(mi('n'))}`,
   phat: `${sub(`<mover accent="true">${mi('p')}<mo>^</mo></mover>`, if_)}${paren(mi('τ'))}`,
@@ -36,9 +39,7 @@ const M = {
 /** English source: math written in plain parentheses (delimiters lost on export). */
 export const INLINE_MATH = {
   'i': M.i, 'f': M.f, 'x': M.x, 'r': M.r, 't': M.t, 'n': M.n, 't_i': M.ti, '\\tau': M.tau,
-  'p\\_{i,f}(t_i)': M.pif,
-  'S_f(x,r,t)': M.sf,
-  'p_f^\\*(x,r,t)': M.pstar,
+  'S': M.S, 'p_i': M.pi, 'z_i\\in\\{0,1\\}': M.zbin, '\\sum_{i\\in S}z_i=1': M.pick, 'z_2=1': M.z2, 'z_3=1': M.z3,
   '\\operatorname\\*{arg,min}': M.argmin, // "," = lost "\," (thin space)
   'O(n)': M.on,
   '\\widehat p\\_{i,f}(\\tau)': M.phat,
@@ -47,20 +48,16 @@ export const INLINE_MATH = {
 /** German source: proper \( … \) delimiters. */
 export const LATEX_MATH = {
   'i': M.i, 'f': M.f, 'x': M.x, 'r': M.r, 't': M.t, 'n': M.n, 't_i': M.ti, '\\tau': M.tau,
-  'p_{i,f}(t_i)': M.pif,
-  'S_f(x,r,t)': M.sf,
-  'p_f^*(x,r,t)': M.pstar,
+  'S': M.S, 'p_i': M.pi, 'z_i\\in\\{0,1\\}': M.zbin, '\\sum_{i\\in S}z_i=1': M.pick, 'z_2=1': M.z2, 'z_3=1': M.z3,
   '\\operatorname*{arg\\,min}': M.argmin,
   'O(n)': M.on,
   '\\widehat p_{i,f}(\\tau)': M.phat,
 };
 
-// The objective in section 02.2: p_f^*(x,r,t) = min_{i in S_f(x,r,t)} p_{i,f}(t_i), boxed.
-// The English export lost the opening "\[\boxed{p_f^*(x,r,t) =" (only the closing "}" and "]"
-// survived); the author confirmed the full formula. The German file contains it intact.
-export const DISPLAY_SOURCE = '\\min\\_{i\\in S_f(x,r,t)}\\\np\\_{i,f}(t_i)\\\n}\\\n]';
-export const DISPLAY_SOURCE_DE = '\\[\n\\boxed{\np_f^*(x,r,t)\n=\n\\min_{i\\in S_f(x,r,t)} p_{i,f}(t_i)\n}\n\\]';
-const DISPLAY_MATH = `${P_STAR}${mo('=')}<munder><mo movablelimits="false">min</mo><mrow>${mi('i')}${mo('∈')}${S_F}</mrow></munder>${P_IF}${paren(T_I)}`;
+// The objective in section 02.2, boxed: min sum_{i in S} p_i z_i. Its constraint sum_{i in S} z_i = 1
+// is stated inline in the text. Both articles write the block identically.
+export const DISPLAY_SOURCE = '\\[\n\\boxed{\\min \\sum_{i\\in S}p_i z_i}\n\\]';
+const DISPLAY_MATH = `<mi>min</mi><mspace width="0.1667em"/><munder><mo movablelimits="false">∑</mo><mrow>${I_IN_S}</mrow></munder>${P_I}${Z_I}`;
 
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const mathEl = (tex, body, display = false) => `<math${display ? ' display="block"' : ''} data-tex="${esc(tex)}">${body}</math>`;
@@ -125,7 +122,7 @@ export function parseArticle(md) {
     const target = afterLastRule ? closing : current.html;
     const h3 = /^### (\d\d\.\d) (.+)$/.exec(b);
     if (h3) { target.push(`<h3><span>${h3[1]}</span> ${inline(h3[2], mode)}</h3>`); continue; }
-    if (b === DISPLAY_SOURCE || b === DISPLAY_SOURCE_DE) { target.push(`<div class="eq"><span class="box">${mathEl('DISPLAY', DISPLAY_MATH, true)}</span></div>`); continue; }
+    if (b === DISPLAY_SOURCE) { target.push(`<div class="eq"><span class="box">${mathEl('DISPLAY', DISPLAY_MATH, true)}</span></div>`); continue; }
     if (HARD_BREAK.test(b)) { target.push(`<p class="sign">${b.split(HARD_BREAK).map((l) => inline(l, mode)).join('<br>')}</p>`); continue; }
     target.push(`<p>${inline(b, mode)}</p>`);
   }
@@ -141,7 +138,18 @@ main{max-width:44rem;margin:0 auto;padding:1rem 1.1rem 3rem}
 a{color:inherit;text-decoration-color:var(--soft);text-underline-offset:3px}
 a:hover{text-decoration-color:currentColor}
 :focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem 1rem}
+.top .nav{flex:1 1 auto;min-width:0}
 .nav{display:flex;flex-wrap:wrap;gap:.2rem 1.4rem}
+/* EN | DE switch, as on the fuel-price pages */
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.lang{display:inline-flex;align-items:stretch;border:1px solid var(--soft);border-radius:var(--r);font-size:.85rem;font-weight:600;letter-spacing:.06em;flex:none}
+.lang>a,.lang>span{display:flex;align-items:center;justify-content:center;width:3rem;min-height:2.75rem;color:var(--mute);text-decoration:none}
+.lang>:first-child{border-radius:5px 0 0 5px}
+.lang>:last-child{border-radius:0 5px 5px 0}
+.lang a:hover{color:var(--fg);background:rgba(245,243,238,.08)}
+.lang [aria-current]{color:var(--bg);background:var(--fg)}
+.lang>.sep{width:1px;min-height:0;background:var(--soft)}
 .nav a{display:inline-flex;align-items:center;min-height:2.75rem;color:var(--mute);text-decoration:none;font-size:.92rem}
 .nav a:hover{color:var(--fg);text-decoration:underline;text-underline-offset:3px}
 .nav.bottom{margin-top:2rem;padding-top:1rem;border-top:1px solid var(--faint)}
@@ -165,10 +173,9 @@ math{font-family:"Cambria Math","STIX Two Math","Latin Modern Math",math;font-si
 .eq .box{display:inline-block;padding:.4em .8em;border:1px solid var(--line);border-radius:var(--r)}
 .eq math{font-size:1.5em}
 hr{border:0;border-top:1px solid var(--faint);margin:2rem 0 1.6rem}
-.closing{text-align:center;padding:0 .5rem}
 .closing p{margin-bottom:1rem}
 .sign{line-height:1.5}
-@media(max-width:30rem){.card{padding:1.1rem .95rem}.eq .box{padding:.35em .5em}.eq math{font-size:1.2em}}`;
+@media(max-width:30rem){.top .nav{flex-direction:column;gap:0}.nav a{min-height:2.5rem}.card{padding:1.1rem .95rem}.eq .box{padding:.35em .5em}.eq math{font-size:1.2em}}`;
 
 const PAGES = {
   en: {
@@ -182,6 +189,15 @@ const PAGES = {
     navLabel: ['Zurück-Navigation', 'Zurück-Navigation (Ende des Artikels)'],
   },
 };
+
+/** EN | DE switch linking the two article versions; a click stores the preference like the home page does. */
+function langSwitch(lang) {
+  const sw = (l) =>
+    l === lang
+      ? `<span aria-current="page" lang="${l}"><span class="sr">${l === 'en' ? 'English' : 'Deutsch'}, </span>${l.toUpperCase()}</span>`
+      : `<a href="${SITE}${PAGES[l].path}" hreflang="${l}" lang="${l}" data-lang="${l}"><span class="sr">${l === 'en' ? 'English' : 'Deutsch'}, </span>${l.toUpperCase()}</a>`;
+  return `<nav class="lang" aria-label="${lang === 'en' ? 'Language' : 'Sprache'}">${sw('en')}<span class="sep" aria-hidden="true"></span>${sw('de')}</nav>`;
+}
 
 function nav(lang, where) {
   const p = PAGES[lang];
@@ -218,7 +234,7 @@ ${CSS}
 </head>
 <body>
 <main>
-${nav(lang, 'top')}
+<div class="top">${nav(lang, 'top')}${langSwitch(lang)}</div>
 <article>
 <header>
 <h1>${esc(a.title)}</h1>
@@ -231,6 +247,7 @@ ${a.closing.join('\n')}
 </article>
 ${nav(lang, 'bottom')}
 </main>
+<script>document.querySelectorAll("[data-lang]").forEach(function(a){a.addEventListener("click",function(){try{localStorage.setItem("lang",a.getAttribute("data-lang"))}catch(e){}})})</script>
 </body>
 </html>
 `;

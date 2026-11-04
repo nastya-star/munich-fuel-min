@@ -2,7 +2,7 @@
 //
 //   GET /api/prices?lat=&lng=&rad=  -> current prices for a search circle, served through the
 //                                      single global PriceGate Durable Object. Without parameters
-//                                      the default area (Marienplatz, 17 km) is used.
+//                                      the default area (Marienplatz, 20 km) is used.
 //
 // The key comes from the Worker secret TANKERKOENIG_API_KEY (`wrangler secret put`). It is
 // never returned, logged or included in error messages. Visitor coordinates are snapped to a

@@ -2,7 +2,10 @@
 // euro (1789 = 1.789 €/L); null means "no valid price". Distances are straight-line km.
 
 export const FUELS = ['e5', 'e10', 'diesel'];
-export const RADII = [5, 10, 17];
+export const RADII = [5, 10, 20];
+export const DEFAULT_RADIUS = 20;
+// Radii offered earlier and the option that replaces them (stored preferences are migrated).
+const RADIUS_MIGRATION = Object.freeze({ 17: 20 });
 export const DEFAULT_LOCATION = Object.freeze({ lat: 48.1374, lng: 11.5755, label: 'Marienplatz, München', source: 'default' });
 export const MAX_RADIUS_KM = 25;
 
@@ -271,7 +274,10 @@ const STORE_KEY = 'fuel-location';
 export function loadSaved(storage) {
   try {
     const v = JSON.parse(storage?.getItem(STORE_KEY) || 'null');
-    if (v && validLocation(v.location) && RADII.includes(v.radius)) return v;
+    if (v && validLocation(v.location)) {
+      const radius = RADIUS_MIGRATION[v.radius] ?? v.radius;
+      return { ...v, radius: RADII.includes(radius) ? radius : DEFAULT_RADIUS };
+    }
   } catch {}
   return null;
 }
