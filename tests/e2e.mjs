@@ -164,7 +164,21 @@ try {
   assert.ok(await ev(`!!document.querySelector('.leaflet-marker-icon[data-tier=min] .mk.min') && /✓/.test(document.querySelector('.leaflet-marker-icon[data-tier=min]').textContent)`), 'minimum markers carry a check mark');
   assert.match(await text('#legend'), /Cheapest 1\.900 €\/L.*Higher/);
   const view = () => ev(`document.querySelector('.leaflet-map-pane').style.transform + '|' + [...document.querySelectorAll('.leaflet-tile')].map(t=>t.src.split('/').slice(-3).join('/')).sort().join(',')`);
-  const view0 = await view();
+  // Leaflet may still be adding tiles for the initial view (fitBounds + zoom animation finish later
+  // on slow CI runners), so compare only settled states: same pane transform and tile set three
+  // times in a row, every tile loaded.
+  const settledView = async () => {
+    let prev = ''; let same = 0;
+    for (let i = 0; i < 60 && same < 2; i++) {
+      await sleep(150);
+      const v = await view();
+      const loaded = await ev(`[...document.querySelectorAll('.leaflet-tile')].every(t=>t.classList.contains('leaflet-tile-loaded'))`);
+      same = v === prev && loaded ? same + 1 : 0;
+      prev = v;
+    }
+    return prev;
+  };
+  const view0 = await settledView();
   const api0 = apiCalls.length;
   for (const f of ['e10', 'diesel', 'e5']) {
     await click(`.card[data-fuel=${f}]`);
@@ -172,7 +186,7 @@ try {
     const res = checkColours(await markers(), f, true);
     assert.ok(res.greens >= 1);
   }
-  assert.equal(await view(), view0, 'switching fuel keeps zoom and position');
+  assert.equal(await settledView(), view0, 'switching fuel keeps zoom and position');
   assert.equal(apiCalls.length, api0, 'switching fuel makes no API request');
   assert.ok(process.env.REAL_TILES || tileCalls > 0, 'tiles requested from the configured provider (intercepted)');
   await waitFor(`document.querySelectorAll('.leaflet-tile-loaded').length>0`, 'tiles loaded');
