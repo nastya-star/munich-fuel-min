@@ -6,6 +6,7 @@ import {
   FUELS, RADII, DEFAULT_RADIUS, DEFAULT_LOCATION, serverArea, responseCovers, localStations, minima, byPrice, byDistance, filterList,
   formatMilli, formatKm, formatTime, stationTitle, stationSubtitle, address, directionsUrl, parseGeocode, requestPosition,
   loadSaved, save, validLocation, priceColors, validPrice, priceGap, formatCents,
+  statsCache, stationEntry, savings, formatEuroRange,
 } from './core.js';
 
 // Public URL of the Cloudflare Worker (worker/). Contains no secret.
@@ -72,6 +73,17 @@ const M = {
     legendPartial: (a, b) => `${a} → ${b} · incomplete data, no confirmed cheapest`,
     legendNone: 'no price',
     mapUnavailable: 'The map could not be loaded. Prices and the list still work.',
+    saveMore: (r) => `You could save ${r} more at a cheaper station.`,
+    saving: (r) => `You're already saving ${r} compared with more expensive stations.`,
+    lowestHere: 'This is the lowest price in this area.',
+    lowestObs: 'This is the lowest observed price; the data is incomplete.',
+    highestHere: 'No station in this area is more expensive.',
+    highestObs: 'No more expensive station was observed; the data is incomplete.',
+    allEqual: (n) => `All ${n} stations charge the same price.`,
+    onlyOne: 'This is the only station with a price for this fuel here, so there is nothing to compare.',
+    noPriceHist: (f) => `No ${f} price is available for this station.`,
+    histDesc: (f, n) => `Histogram of ${f} prices at ${n} ${n === 1 ? 'station' : 'stations'}, share of stations per price interval: `,
+    histSel: (r) => `The selected station is in ${r}.`,
     errors: {
       rate_limited: (s) => `Prices for this area can be requested again in ${s} s (one request per minute for all visitors).`,
       refresh_rate_limited: (s) => `New prices can be requested in ${s} s.`,
@@ -140,6 +152,17 @@ const M = {
     legendPartial: (a, b) => `${a} → ${b} · unvollständige Daten, kein bestätigter Tiefstpreis`,
     legendNone: 'kein Preis',
     mapUnavailable: 'Die Karte konnte nicht geladen werden. Preise und Liste funktionieren weiterhin.',
+    saveMore: (r) => `An einer günstigeren Tankstelle könnten Sie zusätzlich ${r} sparen.`,
+    saving: (r) => `Im Vergleich zu teureren Tankstellen sparen Sie hier bereits ${r}.`,
+    lowestHere: 'Dies ist der niedrigste Preis in diesem Gebiet.',
+    lowestObs: 'Dies ist der niedrigste beobachtete Preis; die Daten sind unvollständig.',
+    highestHere: 'Keine Tankstelle in diesem Gebiet ist teurer.',
+    highestObs: 'Es wurde keine teurere Tankstelle beobachtet; die Daten sind unvollständig.',
+    allEqual: (n) => `Alle ${n} Tankstellen verlangen denselben Preis.`,
+    onlyOne: 'Dies ist hier die einzige Tankstelle mit einem Preis für diesen Kraftstoff – ein Vergleich ist nicht möglich.',
+    noPriceHist: (f) => `Für diese Tankstelle ist kein Preis für ${f} verfügbar.`,
+    histDesc: (f, n) => `Histogramm der Preise für ${f} an ${n} ${n === 1 ? 'Tankstelle' : 'Tankstellen'}, Anteil der Tankstellen je Preisintervall: `,
+    histSel: (r) => `Die ausgewählte Tankstelle liegt im Intervall ${r}.`,
     errors: {
       rate_limited: (s) => `Preise für dieses Gebiet können in ${s} s erneut abgefragt werden (eine Abfrage pro Minute für alle Besucher).`,
       refresh_rate_limited: (s) => `Neue Preise können in ${s} s abgefragt werden.`,
@@ -189,6 +212,8 @@ const els = {
   cards: [...document.querySelectorAll('.card[data-fuel]')], best: $('best'), more: $('more'), moreTitle: $('more-title'),
   bestH: $('best-h'), mapEl: $('map'), legend: $('legend'),
   listQ: $('list-q'), listFuel: $('list-fuel'), listSort: $('list-sort'), listStatus: $('list-status'), listCount: $('list-count'), list: $('list'), showMore: $('show-more'),
+  hist: $('hist'), histSel: $('hist-sel'), histMsg: $('hist-msg'), histPlot: $('hist-plot'), histBars: $('hist-bars'), histYmax: $('hist-ymax'), histX: $('hist-x'),
+  litresBox: $('litres-box'), litres: $('litres'), litresOut: $('litres-out'), save: $('save'), saveA: $('save-a'), saveB: $('save-b'),
 };
 
 const saved = loadSaved(storage);
@@ -202,7 +227,13 @@ const state = {
   listLimit: LIST_PAGE,
   nextAt: 0, // time (ms) when a new upstream request becomes possible
   selectedId: null, // station chosen on the map or in the list
+  snap: 0, // increases whenever state.response is replaced (new, refreshed, partial or cleared data)
 };
+/** Replaces the loaded data; a new snapshot invalidates the cached price statistics. */
+function setResponse(r) {
+  if (r !== state.response) state.snap++;
+  state.response = r;
+}
 let inflight = null;
 let geocodeBusyUntil = 0;
 let ticker = null;
@@ -219,7 +250,7 @@ async function load() {
   state.loading = true;
   state.error = null;
   // Results of a different area must not stay on screen while the new area loads.
-  if (!responseCovers(state.response, state.location, state.radius)) state.response = null;
+  if (!responseCovers(state.response, state.location, state.radius)) setResponse(null);
   render();
   try {
     const url = new URL(`${API_BASE}/api/prices`);
@@ -228,18 +259,18 @@ async function load() {
     const body = await res.json().catch(() => null);
     if (ctrl !== inflight) return;
     if (body && body.ok === true && Array.isArray(body.stations)) {
-      state.response = body;
+      setResponse(body);
       state.error = body.error ? { code: body.error, retry: body.retryAfterSeconds } : null;
       state.nextAt = Date.now() + (body.nextRequestInSeconds || 0) * 1000;
     } else {
       // Never keep showing results that do not cover the newly requested area.
-      if (!responseCovers(state.response, state.location, state.radius)) state.response = null;
+      if (!responseCovers(state.response, state.location, state.radius)) setResponse(null);
       state.error = { code: body?.error || 'unknown', retry: body?.retryAfterSeconds };
       state.nextAt = Date.now() + (body?.retryAfterSeconds || 0) * 1000;
     }
   } catch (e) {
     if (e.name === 'AbortError') return;
-    if (!responseCovers(state.response, state.location, state.radius)) state.response = null;
+    if (!responseCovers(state.response, state.location, state.radius)) setResponse(null);
     state.error = { code: 'network' };
   } finally {
     if (ctrl === inflight) {
@@ -432,12 +463,119 @@ function render() {
   renderNote(partial && !!state.response);
   const visible = onMap(stations);
   const colors = priceColors(visible, state.fuel, { complete: !partial });
-  if (state.selectedId && !visible.some((s) => s.id === state.selectedId)) state.selectedId = null;
+  const byId = new Map(visible.map((s) => [s.id, s]));
+  if (state.selectedId && !byId.has(state.selectedId)) state.selectedId = null;
+  // Everything a station selection needs, so selecting does not recompute any of it.
+  view = { stations, visible, byId, mins, opts, partial, colors, stats: null };
   renderMap(visible, colors);
   renderLegend(colors);
   renderDetail(stations, visible, mins[state.fuel], opts, partial);
   renderList(colors);
+  renderHist();
 }
+let view = null;
+
+// ---- price histogram + savings ---------------------------------------------------------------------
+// Statistics are prepared once per dataset (cache key: data snapshot, location, radius, fuel,
+// open-only). The bars are rebuilt only when that dataset changes; selecting a station moves one
+// highlight and rewrites two sentences; the slider only rewrites the two sentences.
+
+const stats = statsCache();
+const PCT = new Intl.NumberFormat(lang === 'de' ? 'de-DE' : 'en-GB', { maximumFractionDigits: 1 });
+const pctText = (x) => (lang === 'de' ? `${PCT.format(x)} %` : `${PCT.format(x)}%`);
+const Y_STEPS = [5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100];
+const hist = { stats: null, bars: [], on: -1, entry: null, desc: '', a: '', b: '' };
+const binRange = (st, i) => `${formatMilli(st.start + i * st.width, lang)}–${formatMilli(st.start + (i + 1) * st.width - 1, lang)} ${M.perLitre}`;
+
+function datasetStats() {
+  if (!view.stats) {
+    const o = state.location;
+    view.stats = stats.get(state.snap, `${o.lat},${o.lng}|${state.radius}|${state.fuel}|${view.opts.openOnly}`, view.visible, state.fuel);
+  }
+  return view.stats;
+}
+
+/** Rebuilds bars and axis labels: only when the dataset (and so the statistics object) changes. */
+function buildHist(st) {
+  hist.stats = st;
+  hist.on = -1;
+  const k = st.counts.length;
+  const top = Math.max(0, ...st.pct);
+  const yMax = Y_STEPS.find((y) => y >= top - 1e-9) ?? 100;
+  hist.bars = st.pct.map((p) => el('span', { class: 'b', style: `height:${((100 * p) / yMax).toFixed(2)}%` }));
+  fill(els.histBars, hist.bars);
+  els.histYmax.textContent = pctText(yMax);
+  // About five edge labels (first and last edge always), positioned in % – no layout measuring.
+  const step = Math.max(1, Math.ceil(k / 4));
+  const ticks = [];
+  for (let i = 0; i < k; i += step) ticks.push(i);
+  if (k - ticks[ticks.length - 1] < step / 2 && ticks.length > 1) ticks.pop();
+  ticks.push(k);
+  fill(els.histX, ticks.map((i) => el('span', { style: `left:${((100 * i) / k).toFixed(3)}%` }, formatMilli(st.start + i * st.width, lang))));
+  hist.desc = M.histDesc(M.fuel[st.fuel], st.n) + st.counts.map((c, i) => `${binRange(st, i)} ${pctText(st.pct[i])}`).join('; ') + '. ';
+}
+
+/** Shows/hides the component for the selected station; O(1) when the dataset is unchanged. */
+function renderHist() {
+  const sel = state.response && state.selectedId ? view?.byId.get(state.selectedId) : null;
+  if (!sel) {
+    els.hist.hidden = true;
+    hist.entry = null;
+    return;
+  }
+  const st = datasetStats();
+  if (st !== hist.stats) buildHist(st);
+  const entry = stationEntry(st, sel.id);
+  hist.entry = entry;
+  const p = entry ? entry.price : null;
+  els.histSel.textContent = `${stationTitle(sel, M.station)} · ${p === null ? M.noPriceFor(M.fuel[state.fuel]) : `${formatMilli(p, lang)} ${M.perLitre}`}`;
+  const bin = entry ? entry.bin : -1;
+  if (bin !== hist.on) {
+    hist.bars[hist.on]?.classList.remove('on');
+    hist.bars[bin]?.classList.add('on');
+    hist.on = bin;
+  }
+  els.histMsg.hidden = !!entry;
+  els.histPlot.hidden = els.save.hidden = !entry;
+  if (!entry) {
+    els.histMsg.textContent = M.noPriceHist(M.fuel[state.fuel]);
+    els.litresBox.hidden = true;
+  } else {
+    els.histBars.setAttribute('aria-label', hist.desc + M.histSel(binRange(st, bin)));
+    els.litresBox.hidden = st.n === 1 || st.distinct.length === 1; // nothing to compare
+    renderSavings();
+  }
+  els.hist.hidden = false;
+}
+
+const setText = (node, key, text) => {
+  if (hist[key] === text) return;
+  hist[key] = text;
+  node.textContent = text;
+  node.hidden = !text;
+};
+
+/** The two sentences: constant-time arithmetic on the cached differences, two text nodes. */
+function renderSavings() {
+  const e = hist.entry;
+  const st = hist.stats;
+  const litres = Number(els.litres.value);
+  els.litresOut.textContent = `${litres} L`;
+  if (!e) return;
+  let a = '';
+  let b = '';
+  if (st.n === 1) a = M.onlyOne;
+  else if (st.distinct.length === 1) a = M.allEqual(st.n);
+  else {
+    const v = savings(e, litres);
+    const partial = view.partial;
+    a = v.cheaper ? M.saveMore(formatEuroRange(v.cheaper, lang)) : partial ? M.lowestObs : M.lowestHere;
+    b = v.dearer ? M.saving(formatEuroRange(v.dearer, lang)) : partial ? M.highestObs : M.highestHere;
+  }
+  setText(els.saveA, 'a', a);
+  setText(els.saveB, 'b', b);
+}
+els.litres.addEventListener('input', renderSavings);
 
 function renderStatus() {
   clearInterval(ticker);
@@ -645,18 +783,21 @@ function renderMap(visible, colors) {
   }
   for (const s of visible) mapState.stations.set(s.id, s); // current distances and prices
   for (const [id, mk] of mapState.markers) {
-    const c = colors.byId.get(id);
-    const s = mapState.stations.get(id);
-    mk.setIcon(icon(c, id === state.selectedId));
-    mk.setZIndexOffset(zOf(c));
-    const node = mk.getElement();
-    if (node) {
-      node.setAttribute('title', `${stationTitle(s, M.station)}: ${priceText(s)}`);
-      node.setAttribute('data-id', id);
-      node.setAttribute('data-tier', c.tier);
-      node.setAttribute('data-color', c.color);
-    }
+    styleMarker(id, mk, colors.byId.get(id));
     if (mk.isPopupOpen()) mk.setPopupContent(popupContent(id));
+  }
+}
+
+/** Icon, stacking order and data attributes of one marker (its selection ring included). */
+function styleMarker(id, mk, c) {
+  mk.setIcon(icon(c, id === state.selectedId));
+  mk.setZIndexOffset(zOf(c));
+  const node = mk.getElement();
+  if (node) {
+    node.setAttribute('title', `${stationTitle(mapState.stations.get(id), M.station)}: ${priceText(mapState.stations.get(id))}`);
+    node.setAttribute('data-id', id);
+    node.setAttribute('data-tier', c.tier);
+    node.setAttribute('data-color', c.color);
   }
 }
 
@@ -675,9 +816,26 @@ function renderLegend(colors) {
   fill(els.legend, items);
 }
 
+/**
+ * Selection path: no request, no recomputation of stations, minima, colours or the histogram.
+ * Only the previous and new marker, the previous and new list row, the detail card and the
+ * histogram highlight + two sentences change.
+ */
 function selectStation(id, { pan = false } = {}) {
+  if (!view) return;
+  if (id && !view.byId.has(id)) id = null;
+  const prev = state.selectedId;
   state.selectedId = id;
-  render();
+  if (prev !== id) {
+    for (const x of [prev, id]) {
+      if (!x) continue;
+      const mk = mapState.markers.get(x);
+      if (mk) styleMarker(x, mk, view.colors.byId.get(x));
+      els.list.querySelector(`li[data-id="${CSS.escape(x)}"]`)?.classList.toggle('on', x === id);
+    }
+  }
+  renderDetail(view.stations, view.visible, view.mins[state.fuel], view.opts, view.partial);
+  renderHist();
   if (!map) return;
   if (!id) return map.closePopup();
   const mk = mapState.markers.get(id);
